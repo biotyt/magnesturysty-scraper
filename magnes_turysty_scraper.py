@@ -337,4 +337,12 @@ print(f"Zapisano {len(data_rows)} punktów do Google Sheets [{czas}]")
 
 
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
-generuj_mape_html(data_rows, czas)
+print("\nRozpoczęcie generowania mapy HTML...")
+try:
+    generuj_mape_html(data_rows, czas)
+    print("Mapa wygenerowana pomyślnie.")
+except Exception as e:
+    import traceback
+    print(f"BŁĄD podczas generowania mapy: {e}")
+    traceback.print_exc()
+    raise
