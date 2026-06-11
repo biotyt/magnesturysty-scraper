@@ -280,7 +280,7 @@ def generuj_mape_html(punkty, data_aktualizacji):
     print("Wygenerowano index.html")
 
 
-# ── Główna pętla scrapera ─────────────────────────────────────────────────
+# ── Główna pętla scrapera ──────────────────────────────────────────────────
 miasta = pobierz_liste_miast()[:20]
 print(f"Pobrano {len(miasta)} miast. Zaczynam analizę...")
 
