@@ -334,6 +334,9 @@ for i in range(0, len(wiersze), BATCH):
 czas = datetime.now().strftime("%Y-%m-%d %H:%M")
 arkusz_log.append_row([czas, len(data_rows), f"OK – {len(miasta)} miast"])
 print(f"Zapisano {len(data_rows)} punktów do Google Sheets [{czas}]")
+print(f"DEBUG: data_rows ma {len(data_rows)} elementów, zaczynam mapę...")
+import sys
+sys.stdout.flush()
 
 
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
