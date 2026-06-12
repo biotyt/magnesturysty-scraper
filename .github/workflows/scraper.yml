@@ -35,6 +35,9 @@ jobs:
       - name: Uruchom scraper i wygeneruj mapę
         run: python magnes_turysty_scraper.py
 
+      - name: Usuń credentials przed publikacją
+        run: rm -f google_credentials.json
+
       - name: Sprawdź czy index.html istnieje
         run: |
           if [ -f index.html ]; then
