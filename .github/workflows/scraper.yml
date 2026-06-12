@@ -35,22 +35,16 @@ jobs:
       - name: Uruchom scraper i wygeneruj mapę
         run: python magnes_turysty_scraper.py
 
-      - name: Usuń credentials przed publikacją
-        run: rm -f google_credentials.json
-
-      - name: Sprawdź czy index.html istnieje
+      - name: Przygotuj folder do publikacji
         run: |
-          if [ -f index.html ]; then
-            echo "index.html istnieje - rozmiar: $(wc -c < index.html) bajtów"
-          else
-            echo "BŁĄD: index.html nie został wygenerowany!"
-            exit 1
-          fi
+          mkdir -p publish
+          cp index.html publish/
+          echo "Zawartość folderu publish:"
+          ls -la publish/
 
       - name: Opublikuj mapę na GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .
+          publish_dir: ./publish
           publish_branch: gh-pages
-          include_files: index.html
