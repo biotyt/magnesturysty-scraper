@@ -133,24 +133,40 @@ def pobierz_liste_miast():
 # ── Geokodowanie przez Nominatim (OpenStreetMap, darmowe) ─────────────────
 geo_cache = {}
 
+def oczysc_adres(pelny_adres):
+    """Usuwa nazwę firmy i zostawia tylko dane adresowe."""
+    # Przykład: "KSIĘGARNIA KAMER.TON, ul. Nowomiejska 1, Lubraniec" 
+    # zamieni na "ul. Nowomiejska 1, Lubraniec"
+    parts = pelny_adres.split(',')
+    if len(parts) > 1:
+        # Zakładamy, że po pierwszym przecinku jest adres
+        return ",".join(parts[1:]).strip()
+    return pelny_adres
+
 def geokoduj(pelny_adres):
-    """Zamienia adres tekstowy na współrzędne (lat, lng)."""
     if pelny_adres in geo_cache:
         return geo_cache[pelny_adres]
-    try:
-        url = "https://nominatim.openstreetmap.org/search"
-        params = {"q": pelny_adres, "format": "json", "limit": 1, "countrycodes": "pl"}
-        r = requests.get(url, params=params, headers={
-            "User-Agent": "MagnesTurystyScraper/1.0"
-        }, timeout=10)
-        wyniki = r.json()
-        if wyniki:
-            lat = float(wyniki[0]["lat"])
-            lng = float(wyniki[0]["lon"])
-            geo_cache[pelny_adres] = (lat, lng)
-            return lat, lng
-    except Exception:
-        pass
+    
+    # Nominatim wymaga min. 1 sekundy przerwy
+    time.sleep(1.1) 
+    
+    adresy_do_sprawdzenia = [pelny_adres, oczysc_adres(pelny_adres)]
+    
+    for adres in adresy_do_sprawdzenia:
+        try:
+            url = "https://nominatim.openstreetmap.org/search"
+            params = {"q": adres, "format": "json", "limit": 1, "countrycodes": "pl", "addressdetails": 0}
+            r = requests.get(url, params=params, headers={"User-Agent": "MagnesTurystyScraper/1.0"}, timeout=10)
+            wyniki = r.json()
+            
+            if wyniki:
+                lat = float(wyniki[0]["lat"])
+                lng = float(wyniki[0]["lon"])
+                geo_cache[pelny_adres] = (lat, lng)
+                return lat, lng
+        except Exception as e:
+            continue
+            
     geo_cache[pelny_adres] = (None, None)
     return None, None
 
