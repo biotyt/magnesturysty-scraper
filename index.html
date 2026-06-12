@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MagnesTurysty – Mapa punktów sprzedaży</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; }
+    #header { background: #2c3e50; color: white; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+    #header h1 { font-size: 16px; font-weight: 500; }
+    #header span { font-size: 12px; opacity: 0.7; }
+    #search-bar { padding: 10px 16px; background: white; border-bottom: 1px solid #e0e0e0; display: flex; gap: 8px; }
+    #search { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; }
+    #search:focus { border-color: #2980b9; }
+    #counter { font-size: 13px; color: #666; display: flex; align-items: center; white-space: nowrap; }
+    #map { width: 100%; height: calc(100vh - 96px); }
+    .popup-nazwa { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .popup-adres { font-size: 13px; color: #555; }
+    .popup-miasto { font-size: 12px; color: #888; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <h1>📍 MagnesTurysty – Punkty sprzedaży</h1>
+    <span>Aktualizacja: 2026-06-12 18:04</span>
+  </div>
+  <div id="search-bar">
+    <input id="search" type="text" placeholder="Szukaj miejscowości lub punktu..."/>
+    <div id="counter">Ładowanie...</div>
+  </div>
+  <div id="map"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+  <script>
+    const punkty = [{"nazwa": "PGE GIGANTY MOCY sklepik przy Muzeum Nauk", "adres": "Plac Narutowicza 3", "miasto": "Bełchatów, łódzkie", "lat": 51.3669798, "lng": 19.371947}, {"nazwa": "Centrum Informacji Turystycznej i Kulturalnej w Białej Podlaskiej", "adres": "Plac Wolności 10", "miasto": "Biała Podlaska, lubelskie", "lat": 52.0344038, "lng": 23.1187761}, {"nazwa": "Błońskie Starocia – sklep z antykami", "adres": "Rynek 14, 05-870", "miasto": "Błonie, mazowieckie", "lat": 52.1949126, "lng": 20.616303}, {"nazwa": "Punkt Informacji Turystycznej", "adres": "Rynek 24", "miasto": "Bobowa, małopolskie", "lat": 49.7077772, "lng": 20.9425182}, {"nazwa": "Biblioteka przy Miejsko-Gminnym Ośrodku Kultury", "adres": "Rynek Kościuszki 14", "miasto": "Bolimów, łódzkie", "lat": 52.0756807, "lng": 20.1646827}, {"nazwa": "WELESOWY KRAM", "adres": "", "miasto": "Byczyna, opolskie", "lat": 51.1142355, "lng": 18.2143288}, {"nazwa": "„M a ł p k a”", "adres": "Rynek 13", "miasto": "Byczyna, opolskie", "lat": 51.1137798, "lng": 18.21463}];
+
+    const map = L.map('map').setView([52.0, 19.5], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19
+    }).addTo(map);
+
+    const icon = L.divIcon({
+      html: '<div style="width:10px;height:10px;border-radius:50%;background:#e74c3c;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>',
+      className: '',
+      iconSize: [10, 10],
+      iconAnchor: [5, 5],
+      popupAnchor: [0, -8]
+    });
+
+    const cluster = L.markerClusterGroup({ maxClusterRadius: 40 });
+    const wszystkieMarkery = [];
+
+    punkty.forEach(p => {
+      const marker = L.marker([p.lat, p.lng], {icon})
+        .bindPopup(`<div class="popup-nazwa">${p.nazwa}</div>
+          <div class="popup-adres">${p.adres || '–'}</div>
+          <div class="popup-miasto">${p.miasto}</div>`);
+      marker._dane = p;
+      cluster.addLayer(marker);
+      wszystkieMarkery.push(marker);
+    });
+
+    map.addLayer(cluster);
+    document.getElementById('counter').textContent = punkty.length + ' punktów';
+
+    // Wyszukiwarka
+    document.getElementById('search').addEventListener('input', function() {
+      const q = this.value.toLowerCase().trim();
+      cluster.clearLayers();
+      const pasujace = q
+        ? wszystkieMarkery.filter(m =>
+            m._dane.nazwa.toLowerCase().includes(q) ||
+            m._dane.miasto.toLowerCase().includes(q) ||
+            m._dane.adres.toLowerCase().includes(q))
+        : wszystkieMarkery;
+      pasujace.forEach(m => cluster.addLayer(m));
+      document.getElementById('counter').textContent = pasujace.length + ' punktów';
+    });
+  </script>
+</body>
+</html>
