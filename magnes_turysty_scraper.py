@@ -208,9 +208,12 @@ def generuj_mape_html(punkty, magnesy, data_aktualizacji):
     geokodowane = []
     for i, p in enumerate(punkty):
         if p["Adres"]:
-            zapytanie = f"{p['Adres']}, {p['Miejscowość']}, Polska"
+            # Wyciągnij tylko nazwę miasta (przed przecinkiem) żeby uniknąć duplikacji
+            miasto_krotko = p["Miejscowość"].split(',')[0].strip()
+            zapytanie = f"{p['Adres']}, {miasto_krotko}, Polska"
         else:
-            zapytanie = f"{p['Miejscowość']}, Polska"
+            miasto_krotko = p["Miejscowość"].split(',')[0].strip()
+            zapytanie = f"{miasto_krotko}, Polska"
 
         lat, lng = geokoduj(zapytanie)
         if lat and lng:
