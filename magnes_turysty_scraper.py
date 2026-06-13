@@ -1,3 +1,4 @@
+import os
 import requests
 import gspread
 from google.oauth2.service_account import Credentials
@@ -130,43 +131,40 @@ def pobierz_liste_miast():
         return []
 
 
-# ── Geokodowanie przez Nominatim (OpenStreetMap, darmowe) ─────────────────
+# ── Geokodowanie przez Google Maps Geocoding API ──────────────────────────
 geo_cache = {}
+GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 
 def oczysc_adres(pelny_adres):
     """Usuwa nazwę firmy i zostawia tylko dane adresowe."""
-    # Przykład: "KSIĘGARNIA KAMER.TON, ul. Nowomiejska 1, Lubraniec" 
-    # zamieni na "ul. Nowomiejska 1, Lubraniec"
     parts = pelny_adres.split(',')
     if len(parts) > 1:
-        # Zakładamy, że po pierwszym przecinku jest adres
         return ",".join(parts[1:]).strip()
     return pelny_adres
 
 def geokoduj(pelny_adres):
     if pelny_adres in geo_cache:
         return geo_cache[pelny_adres]
-    
-    # Nominatim wymaga min. 1 sekundy przerwy
-    time.sleep(1.1) 
-    
-    adresy_do_sprawdzenia = [pelny_adres, oczysc_adres(pelny_adres)]
-    
-    for adres in adresy_do_sprawdzenia:
+
+    for adres in [pelny_adres, oczysc_adres(pelny_adres)]:
         try:
-            url = "https://nominatim.openstreetmap.org/search"
-            params = {"q": adres, "format": "json", "limit": 1, "countrycodes": "pl", "addressdetails": 0}
-            r = requests.get(url, params=params, headers={"User-Agent": "MagnesTurystyScraper/1.0"}, timeout=10)
+            url = "https://maps.googleapis.com/maps/api/geocode/json"
+            params = {
+                "address": adres,
+                "key": GOOGLE_MAPS_API_KEY,
+                "region": "pl",
+                "language": "pl"
+            }
+            r = requests.get(url, params=params, timeout=10)
             wyniki = r.json()
-            
-            if wyniki:
-                lat = float(wyniki[0]["lat"])
-                lng = float(wyniki[0]["lon"])
+            if wyniki.get("status") == "OK":
+                loc = wyniki["results"][0]["geometry"]["location"]
+                lat, lng = loc["lat"], loc["lng"]
                 geo_cache[pelny_adres] = (lat, lng)
                 return lat, lng
-        except Exception as e:
+        except Exception:
             continue
-            
+
     geo_cache[pelny_adres] = (None, None)
     return None, None
 
@@ -175,7 +173,6 @@ def geokoduj(pelny_adres):
 def generuj_mape_html(punkty, data_aktualizacji):
     """Generuje plik index.html z mapą Leaflet.js."""
 
-    # Geokodujemy tylko punkty z adresem
     print("\nGeokodowanie adresów...")
     geokodowane = []
     for i, p in enumerate(punkty):
@@ -196,10 +193,8 @@ def generuj_mape_html(punkty, data_aktualizacji):
         else:
             print(f"  BRAK GEOKODU: {p['Punkt']} | {p['Adres']} | {p['Miejscowość']}")
 
-        if (i + 1) % 50 == 0:
+        if (i + 1) % 100 == 0:
             print(f"  Geokodowano {i+1}/{len(punkty)}...")
-
-        time.sleep(1.1)  # Nominatim wymaga max 1 req/sek
 
     print(f"  Geokodowano {len(geokodowane)}/{len(punkty)} punktów.")
 
@@ -276,7 +271,6 @@ def generuj_mape_html(punkty, data_aktualizacji):
     map.addLayer(cluster);
     document.getElementById('counter').textContent = punkty.length + ' punktów';
 
-    // Wyszukiwarka
     document.getElementById('search').addEventListener('input', function() {{
       const q = this.value.toLowerCase().trim();
       cluster.clearLayers();
@@ -284,7 +278,7 @@ def generuj_mape_html(punkty, data_aktualizacji):
         ? wszystkieMarkery.filter(m =>
             m._dane.nazwa.toLowerCase().includes(q) ||
             m._dane.miasto.toLowerCase().includes(q) ||
-            m._dane.adres.toLowerCase().includes(q))
+            (m._dane.adres && m._dane.adres.toLowerCase().includes(q)))
         : wszystkieMarkery;
       pasujace.forEach(m => cluster.addLayer(m));
       document.getElementById('counter').textContent = pasujace.length + ' punktów';
@@ -352,9 +346,6 @@ for i in range(0, len(wiersze), BATCH):
 czas = datetime.now().strftime("%Y-%m-%d %H:%M")
 arkusz_log.append_row([czas, len(data_rows), f"OK – {len(miasta)} miast"])
 print(f"Zapisano {len(data_rows)} punktów do Google Sheets [{czas}]")
-print(f"DEBUG: data_rows ma {len(data_rows)} elementów, zaczynam mapę...")
-import sys
-sys.stdout.flush()
 
 
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
