@@ -8,7 +8,7 @@ import time
 import json
 from datetime import datetime
 
-# ── Konfiguracja Google Sheets ────────────────────────────────────────────
+# ─ Konfiguracja Google Sheets ────────────────────────────────────────────
 CREDENTIALS_FILE = "google_credentials.json"
 SPREADSHEET_NAME = "MagnesTurysty"
 
@@ -37,7 +37,7 @@ def polacz_z_arkuszem():
     return dane, log, moje_magnesy
 
 
-# ── Konfiguracja scrapera ─────────────────────────────────────────────────
+# ── Konfiguracja scrapera ────────────────────────────────────────────────
 data_rows = []
 
 headers = {
@@ -179,7 +179,13 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
     """Generuje plik index.html z mapą Leaflet.js."""
 
     print("\nGeokodowanie adresów...")
+    print(f"  Lista 'Moje magnesy' zawiera {len(moje_magnesy)} miejscowości:")
+    for miasto in sorted(moje_magnesy):
+        print(f"    - {miasto}")
+    
     geokodowane = []
+    dopasowane_magnesy = set()
+    
     for i, p in enumerate(punkty):
         if p["Adres"]:
             zapytanie = f"{p['Adres']}, {p['Miejscowość']}, Polska"
@@ -189,7 +195,12 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
         lat, lng = geokoduj(zapytanie)
         if lat and lng:
             # Sprawdź czy ta miejscowość jest w liście "Moje magnesy"
-            posiada_magnes = p["Miejscowość"].lower() in moje_magnesy
+            miasto_lower = p["Miejscowość"].lower().strip()
+            posiada_magnes = miasto_lower in moje_magnesy
+            
+            if posiada_magnes:
+                dopasowane_magnesy.add(miasto_lower)
+            
             geokodowane.append({
                 "nazwa": p["Punkt"],
                 "adres": p["Adres"],
@@ -205,6 +216,15 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
             print(f"  Geokodowano {i+1}/{len(punkty)}...")
 
     print(f"  Geokodowano {len(geokodowane)}/{len(punkty)} punktów.")
+    print(f"  Dopasowano {len(dopasowane_magnesy)} z {len(moje_magnesy)} magnesów:")
+    for miasto in sorted(dopasowane_magnesy):
+        print(f"    ✓ {miasto}")
+    
+    niedopasowane = moje_magnesy - dopasowane_magnesy
+    if niedopasowane:
+        print(f"  NIEDOPASOWANE magnesy ({len(niedopasowane)}):")
+        for miasto in sorted(niedopasowane):
+            print(f"    ✗ {miasto}")
 
     punkty_json = json.dumps(geokodowane, ensure_ascii=False)
 
@@ -269,7 +289,7 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
 
     // Ikona dla punktów z magnesem (Twój obrazek z GitHub - 48x32 px)
     const iconPosiadam = L.icon({{
-      iconUrl: 'https://raw.githubusercontent.com/biotyt/magnesturysty-scraper/main/Magnes.png',
+      iconUrl: 'https://raw.githubusercontent.com/twojanazwa/magnes-turysty/main/Magnes.png',
       shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
       iconSize: [48, 32],
       iconAnchor: [24, 32],
@@ -382,21 +402,39 @@ print(f"Zapisano {len(data_rows)} punktów do Google Sheets [{czas}]")
 
 
 # ── Odczyt "Moje magnesy" ─────────────────────────────────────────────────
-print("\nOdczytuję listę 'Moje magnesy'...")
+print("\n" + "="*60)
+print("ODCZYT ARKUSZA 'MOJE MAGNESY'")
+print("="*60)
 moje_magnesy_lista = set()
 try:
     dane_moje = arkusz_moje_magnesy.get_all_values()
+    print(f"  Surowe dane z arkusza ({len(dane_moje)} wierszy):")
+    for i, wiersz in enumerate(dane_moje[:10]):  # Pokaż pierwsze 10 wierszy
+        print(f"    Wiersz {i}: {wiersz}")
+    if len(dane_moje) > 10:
+        print(f"    ... i {len(dane_moje) - 10} więcej wierszy")
+    
     # Pomijamy nagłówek
     for wiersz in dane_moje[1:]:
-        if wiersz and wiersz[0].strip():
-            moje_magnesy_lista.add(wiersz[0].strip().lower())
-    print(f"  Znaleziono {len(moje_magnesy_lista)} miejscowości z magnesami")
+        if wiersz and len(wiersz) > 0 and wiersz[0].strip():
+            miasto = wiersz[0].strip().lower()
+            moje_magnesy_lista.add(miasto)
+            print(f"    Dodano: '{wiersz[0].strip()}' -> '{miasto}'")
+    
+    print(f"\n  Łącznie wczytano {len(moje_magnesy_lista)} miejscowości:")
+    for miasto in sorted(moje_magnesy_lista):
+        print(f"    - {miasto}")
+        
 except Exception as e:
-    print(f"  Błąd odczytu 'Moje magnesy': {e}")
+    print(f"  BŁĄD odczytu 'Moje magnesy': {e}")
+    import traceback
+    traceback.print_exc()
 
 
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
-print("\nRozpoczęcie generowania mapy HTML...")
+print("\n" + "="*60)
+print("GENEROWANIE MAPY HTML")
+print("="*60)
 try:
     generuj_mape_html(data_rows, moje_magnesy_lista, czas)
     print("Mapa wygenerowana pomyślnie.")
