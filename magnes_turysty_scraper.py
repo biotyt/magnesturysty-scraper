@@ -292,7 +292,7 @@ def generuj_mape_html(punkty, magnesy, data_aktualizacji):
     }});
 
     const iconMagnes = L.icon({{
-      iconUrl: 'https://raw.githubusercontent.com/biotyt/magnesturysty-scraper/main/Magnes.Png',
+      iconUrl: 'https://raw.githubusercontent.com/biotyt/magnesturysty-scraper/main/Magnes.png',
       iconSize: [48, 32],
       iconAnchor: [24, 32],
       popupAnchor: [0, -32]
