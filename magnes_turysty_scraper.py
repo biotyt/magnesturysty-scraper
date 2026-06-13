@@ -247,13 +247,13 @@ def generuj_mape_html(punkty, data_aktualizacji):
       maxZoom: 19
     }}).addTo(map);
 
-    const icon = L.divIcon({{
-      html: '<div style="width:10px;height:10px;border-radius:50%;background:#e74c3c;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>',
-      className: '',
-      iconSize: [10, 10],
-      iconAnchor: [5, 5],
-      popupAnchor: [0, -8]
-    }});
+    const icon = L.icon({
+      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34]
+    });
 
     const cluster = L.markerClusterGroup({{ maxClusterRadius: 40 }});
     const wszystkieMarkery = [];
