@@ -291,12 +291,11 @@ def generuj_mape_html(punkty, magnesy, data_aktualizacji):
       iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
     }});
 
-    const iconMagnes = L.divIcon({{
-      html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.4));">🧲</div>',
-      className: '',
-      iconSize: [26, 26],
-      iconAnchor: [13, 26],
-      popupAnchor: [0, -28]
+    const iconMagnes = L.icon({{
+      iconUrl: 'https://raw.githubusercontent.com/biotyt/magnesturysty-scraper/main/Magnes.Png',
+      iconSize: [48, 32],
+      iconAnchor: [24, 32],
+      popupAnchor: [0, -32]
     }});
 
     const cluster = L.markerClusterGroup({{ maxClusterRadius: 40 }});
