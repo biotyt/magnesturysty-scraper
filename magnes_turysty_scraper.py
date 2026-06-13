@@ -8,7 +8,7 @@ import time
 import json
 from datetime import datetime
 
-# ─ Konfiguracja Google Sheets ────────────────────────────────────────────
+# ── Konfiguracja Google Sheets ────────────────────────────────────────────
 CREDENTIALS_FILE = "google_credentials.json"
 SPREADSHEET_NAME = "MagnesTurysty"
 
@@ -29,15 +29,44 @@ def polacz_z_arkuszem():
         log = arkusz.worksheet("Log")
     except gspread.exceptions.WorksheetNotFound:
         log = arkusz.add_worksheet(title="Log", rows=1000, cols=3)
+    return dane, log
+
+
+def pobierz_mam_magnesy(klient_gspread):
+    """Pobiera i geokoduje miejscowości z zakładki 'Mam magnes'."""
     try:
-        moje_magnesy = arkusz.worksheet("Moje magnesy")
-    except gspread.exceptions.WorksheetNotFound:
-        moje_magnesy = arkusz.add_worksheet(title="Moje magnesy", rows=1000, cols=2)
-        moje_magnesy.append_row(["Miejscowość", "Data dodania"])
-    return dane, log, moje_magnesy
+        arkusz = klient_gspread.open(SPREADSHEET_NAME)
+        try:
+            sheet = arkusz.worksheet("Mam magnes")
+        except gspread.exceptions.WorksheetNotFound:
+            sheet = arkusz.add_worksheet(title="Mam magnes", rows=500, cols=2)
+            sheet.append_row(["Miejscowość", "Data dodania"])
+            print("  Utworzono zakładkę 'Mam magnes'.")
+            return []
+
+        wiersze = sheet.get_all_records()
+        magnesy = []
+        for w in wiersze:
+            nazwa = str(w.get("Miejscowość", "")).strip()
+            if not nazwa:
+                continue
+            # Geokoduj automatycznie
+            zapytanie = f"{nazwa}, Polska"
+            lat, lng = geokoduj(zapytanie)
+            if lat and lng:
+                magnesy.append({"miasto": nazwa, "lat": lat, "lng": lng})
+                print(f"  ✓ {nazwa} -> {lat:.4f}, {lng:.4f}")
+            else:
+                print(f"  ✗ BRAK GEOKODU: {nazwa}")
+
+        print(f"  Geokodowano {len(magnesy)} miejscowości z 'Mam magnes'.")
+        return magnesy
+    except Exception as e:
+        print(f"  UWAGA: Błąd pobierania zakładki 'Mam magnes': {e}")
+        return []
 
 
-# ── Konfiguracja scrapera ────────────────────────────────────────────────
+# ── Konfiguracja scrapera ─────────────────────────────────────────────────
 data_rows = []
 
 headers = {
@@ -141,7 +170,6 @@ geo_cache = {}
 GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 
 def oczysc_adres(pelny_adres):
-    """Usuwa nazwę firmy i zostawia tylko dane adresowe."""
     parts = pelny_adres.split(',')
     if len(parts) > 1:
         return ",".join(parts[1:]).strip()
@@ -150,7 +178,6 @@ def oczysc_adres(pelny_adres):
 def geokoduj(pelny_adres):
     if pelny_adres in geo_cache:
         return geo_cache[pelny_adres]
-
     for adres in [pelny_adres, oczysc_adres(pelny_adres)]:
         try:
             url = "https://maps.googleapis.com/maps/api/geocode/json"
@@ -169,49 +196,16 @@ def geokoduj(pelny_adres):
                 return lat, lng
         except Exception:
             continue
-
     geo_cache[pelny_adres] = (None, None)
     return None, None
 
 
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
-def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
+def generuj_mape_html(punkty, magnesy, data_aktualizacji):
     """Generuje plik index.html z mapą Leaflet.js."""
 
-    print("\n" + "="*70)
-    print("DIAGNOSTYKA - JAK NAZYWAJĄ SIĘ MIASTA W SCRAPERZE")
-    print("="*70)
-    print("Skopiuj poniższe nazwy do arkusza 'Moje magnesy' (z województwami):")
-    print()
-    
-    # Pobierz unikalne miasta ze scrapera
-    unikalne_miasta = sorted(set(p["Miejscowość"] for p in punkty))
-    
-    # Pokaż miasta, które masz w arkuszu (żebyś wiedział które dodać)
-    print("TWOJE MAGNESY (z arkusza):")
-    for magnes in sorted(moje_magnesy):
-        # Znajdź pasujące miasta w scraperze
-        pasujace = [m for m in unikalne_miasta if m.lower().startswith(magnes + " ") or m.lower() == magnes]
-        if pasujace:
-            print(f"  '{magnes}' -> {pasujace[0]}")
-        else:
-            print(f"  '{magnes}' -> NIE MA W SCRAPERZE!")
-    
-    print()
-    print("WSZYSTKIE DOSTĘPNE MIASTA W SCRAPERZE (pierwsze 50):")
-    for i, miasto in enumerate(unikalne_miasta[:50], 1):
-        print(f"  {i:3d}. {miasto}")
-    if len(unikalne_miasta) > 50:
-        print(f"  ... i {len(unikalne_miasta) - 50} więcej")
-    
-    print()
-    print("="*70)
-    print()
-    
-    print("Geokodowanie adresów...")
+    print("\nGeokodowanie adresów...")
     geokodowane = []
-    dopasowane_magnesy = set()
-    
     for i, p in enumerate(punkty):
         if p["Adres"]:
             zapytanie = f"{p['Adres']}, {p['Miejscowość']}, Polska"
@@ -220,31 +214,12 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
 
         lat, lng = geokoduj(zapytanie)
         if lat and lng:
-            # Sprawdź czy ta miejscowość jest w liście "Moje magnesy"
-            miasto_lower = p["Miejscowość"].lower().strip()
-            
-            posiada_magnes = False
-            for magnes in moje_magnesy:
-                magnes_lower = magnes.lower().strip()
-                # Dokładne dopasowanie (jeśli dodałeś województwo do arkusza)
-                if magnes_lower == miasto_lower:
-                    posiada_magnes = True
-                    break
-                # Dopasowanie bez województwa (fallback)
-                if miasto_lower.startswith(magnes_lower + " ") or miasto_lower.startswith(magnes_lower + "-"):
-                    posiada_magnes = True
-                    break
-            
-            if posiada_magnes:
-                dopasowane_magnesy.add(miasto_lower)
-            
             geokodowane.append({
                 "nazwa": p["Punkt"],
                 "adres": p["Adres"],
                 "miasto": p["Miejscowość"],
                 "lat": lat,
-                "lng": lng,
-                "posiadam": posiada_magnes
+                "lng": lng
             })
         else:
             print(f"  BRAK GEOKODU: {p['Punkt']} | {p['Adres']} | {p['Miejscowość']}")
@@ -253,13 +228,9 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
             print(f"  Geokodowano {i+1}/{len(punkty)}...")
 
     print(f"  Geokodowano {len(geokodowane)}/{len(punkty)} punktów.")
-    print(f"  Dopasowano {len(dopasowane_magnesy)} punktów z magnesem")
-    if dopasowane_magnesy:
-        print(f"  Przykłady dopasowanych:")
-        for m in sorted(dopasowane_magnesy)[:10]:
-            print(f"    ✓ {m}")
 
     punkty_json = json.dumps(geokodowane, ensure_ascii=False)
+    magnesy_json = json.dumps(magnesy, ensure_ascii=False)
 
     html = f"""<!DOCTYPE html>
 <html lang="pl">
@@ -276,17 +247,19 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
     #header {{ background: #2c3e50; color: white; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }}
     #header h1 {{ font-size: 16px; font-weight: 500; }}
     #header span {{ font-size: 12px; opacity: 0.7; }}
-    #search-bar {{ padding: 10px 16px; background: white; border-bottom: 1px solid #e0e0e0; display: flex; gap: 8px; }}
+    #search-bar {{ padding: 10px 16px; background: white; border-bottom: 1px solid #e0e0e0; display: flex; gap: 8px; align-items: center; }}
     #search {{ flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; }}
     #search:focus {{ border-color: #2980b9; }}
-    #counter {{ font-size: 13px; color: #666; display: flex; align-items: center; white-space: nowrap; }}
+    #counter {{ font-size: 13px; color: #666; white-space: nowrap; }}
     #map {{ width: 100%; height: calc(100vh - 96px); }}
     .popup-nazwa {{ font-weight: 600; font-size: 14px; margin-bottom: 4px; }}
     .popup-adres {{ font-size: 13px; color: #555; }}
     .popup-miasto {{ font-size: 12px; color: #888; margin-top: 2px; }}
-    .popup-status {{ font-size: 12px; margin-top: 4px; padding: 4px 8px; border-radius: 4px; display: inline-block; }}
-    .popup-status.posiadam {{ background: #d4edda; color: #155724; }}
-    .popup-status.brak {{ background: #f8d7da; color: #721c24; }}
+    .popup-magnes {{ font-size: 13px; color: #c0392b; font-weight: 500; margin-top: 4px; }}
+    .legenda {{ position: absolute; bottom: 30px; right: 10px; z-index: 1000; background: white;
+                padding: 10px 14px; border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.2);
+                font-size: 13px; line-height: 1.8; }}
+    .legenda-item {{ display: flex; align-items: center; gap: 8px; }}
   </style>
 </head>
 <body>
@@ -304,6 +277,7 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
   <script>
     const punkty = {punkty_json};
+    const magnesy = {magnesy_json};
 
     const map = L.map('map').setView([52.0, 19.5], 6);
     L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
@@ -311,48 +285,54 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
       maxZoom: 19
     }}).addTo(map);
 
-    // Ikona dla punktów bez magnesu (standardowa niebieska pinezka)
-    const iconStandard = L.icon({{
+    const iconPunkt = L.icon({{
       iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
       shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34]
+      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
     }});
 
-    // Ikona dla punktów z magnesem (Twój obrazek z GitHub - 48x32 px)
-    const iconPosiadam = L.icon({{
-      iconUrl: 'https://raw.githubusercontent.com/twojanazwa/magnes-turysty/main/Magnes.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-      iconSize: [48, 32],
-      iconAnchor: [24, 32],
-      popupAnchor: [1, -34]
+    const iconMagnes = L.divIcon({{
+      html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.4));">🧲</div>',
+      className: '',
+      iconSize: [26, 26],
+      iconAnchor: [13, 26],
+      popupAnchor: [0, -28]
     }});
 
     const cluster = L.markerClusterGroup({{ maxClusterRadius: 40 }});
     const wszystkieMarkery = [];
 
     punkty.forEach(p => {{
-      const icon = p.posiadam ? iconPosiadam : iconStandard;
-      const statusHtml = p.posiadam 
-        ? '<div class="popup-status posiadam">✓ Posiadam magnes</div>'
-        : '<div class="popup-status brak">Brak magnesu</div>';
-      
-      const marker = L.marker([p.lat, p.lng], {{icon}})
+      const marker = L.marker([p.lat, p.lng], {{icon: iconPunkt}})
         .bindPopup(`<div class="popup-nazwa">${{p.nazwa}}</div>
           <div class="popup-adres">${{p.adres || '–'}}</div>
-          <div class="popup-miasto">${{p.miasto}}</div>
-          ${{statusHtml}}`);
+          <div class="popup-miasto">${{p.miasto}}</div>`);
       marker._dane = p;
       cluster.addLayer(marker);
       wszystkieMarkery.push(marker);
     }});
 
     map.addLayer(cluster);
-    
-    const ilePosiadam = punkty.filter(p => p.posiadam).length;
-    document.getElementById('counter').textContent = 
-      punkty.length + ' punktów (' + ilePosiadam + ' z magnesem)';
+
+    magnesy.forEach(m => {{
+      L.marker([m.lat, m.lng], {{icon: iconMagnes, zIndexOffset: 1000}})
+        .addTo(map)
+        .bindPopup(`<div class="popup-nazwa">${{m.miasto}}</div>
+          <div class="popup-magnes">🧲 Mam magnes z tej miejscowości!</div>`);
+    }});
+
+    document.getElementById('counter').textContent = punkty.length + ' punktów';
+
+    const legenda = L.control({{position: 'bottomright'}});
+    legenda.onAdd = () => {{
+      const div = L.DomUtil.create('div', 'legenda');
+      div.innerHTML = `
+        <div class="legenda-item"><img src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png" style="height:20px"> Punkt sprzedaży</div>
+        <div class="legenda-item" style="margin-top:4px"><span style="font-size:20px">🧲</span> Mam magnes</div>
+      `;
+      return div;
+    }};
+    legenda.addTo(map);
 
     document.getElementById('search').addEventListener('input', function() {{
       const q = this.value.toLowerCase().trim();
@@ -364,10 +344,7 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
             (m._dane.adres && m._dane.adres.toLowerCase().includes(q)))
         : wszystkieMarkery;
       pasujace.forEach(m => cluster.addLayer(m));
-      
-      const ilePosiadamFiltr = pasujace.filter(m => m._dane.posiadam).length;
-      document.getElementById('counter').textContent = 
-        pasujace.length + ' punktów (' + ilePosiadamFiltr + ' z magnesem)';
+      document.getElementById('counter').textContent = pasujace.length + ' punktów';
     }});
   </script>
 </body>
@@ -376,6 +353,7 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html)
     print("Wygenerowano index.html")
+
 
 # ── Główna pętla scrapera ──────────────────────────────────────────────────
 miasta = pobierz_liste_miast()[:20]
@@ -417,7 +395,10 @@ for index, pozycja in enumerate(miasta):
 
 # ── Zapis do Google Sheets ────────────────────────────────────────────────
 print("\nŁączę z Google Sheets...")
-arkusz_dane, arkusz_log, arkusz_moje_magnesy = polacz_z_arkuszem()
+creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
+klient_gspread = gspread.authorize(creds)
+
+arkusz_dane, arkusz_log = polacz_z_arkuszem()
 arkusz_dane.clear()
 naglowki = ["Miejscowość", "Punkt", "Adres", "Pełny zapis (Miasto, Adres)"]
 arkusz_dane.append_row(naglowki)
@@ -432,84 +413,14 @@ czas = datetime.now().strftime("%Y-%m-%d %H:%M")
 arkusz_log.append_row([czas, len(data_rows), f"OK – {len(miasta)} miast"])
 print(f"Zapisano {len(data_rows)} punktów do Google Sheets [{czas}]")
 
-
-# ── Odczyt "Moje magnesy" ─────────────────────────────────────────────────
-print("\n" + "="*60)
-print("ODCZYT ARKUSZA 'MOJE MAGNESY'")
-print("="*60)
-moje_magnesy_lista = set()
-try:
-    dane_moje = arkusz_moje_magnesy.get_all_values()
-    print(f"  Surowe dane z arkusza ({len(dane_moje)} wierszy):")
-    for i, wiersz in enumerate(dane_moje[:10]):
-        print(f"    Wiersz {i}: {wiersz}")
-    if len(dane_moje) > 10:
-        print(f"    ... i {len(dane_moje) - 10} więcej wierszy")
-    
-    for wiersz in dane_moje[1:]:
-        if wiersz and len(wiersz) > 0 and wiersz[0].strip():
-            miasto = wiersz[0].strip().lower()
-            moje_magnesy_lista.add(miasto)
-            print(f"    Dodano: '{wiersz[0].strip()}' -> '{miasto}'")
-    
-    print(f"\n  Łącznie wczytano {len(moje_magnesy_lista)} miejscowości:")
-    for miasto in sorted(moje_magnesy_lista):
-        print(f"    - {miasto}")
-        
-except Exception as e:
-    print(f"  BŁĄD odczytu 'Moje magnesy': {e}")
-    import traceback
-    traceback.print_exc()
-
-
-# ── Analiza nazw miejscowości ze scrapera ─────────────────────────────────
-print("\n" + "="*60)
-print("ANALIZA NAZW MIEJSCOWOŚCI ZE SCRAPERA")
-print("="*60)
-unikalne_miasta = set()
-for p in data_rows:
-    unikalne_miasta.add(p["Miejscowość"])
-
-print(f"  Unikalne miejscowości ze scrapera ({len(unikalne_miasta)}):")
-for miasto in sorted(unikalne_miasta)[:50]:
-    print(f"    - '{miasto}' -> '{miasto.lower().strip()}'")
-if len(unikalne_miasta) > 50:
-    print(f"    ... i {len(unikalne_miasta) - 50} więcej")
-
-
-# ── Porównanie i testowanie dopasowania ───────────────────────────────────
-print("\n" + "="*60)
-print("TESTOWANIE DOPASOWANIA")
-print("="*60)
-print(f"  Sprawdzam czy magnesy z arkusza pasują do danych ze scrapera...")
-print()
-
-dopasowane = []
-niedopasowane = []
-
-for magnes in sorted(moje_magnesy_lista):
-    # Szukaj dokładnego dopasowania
-    if magnes in [m.lower().strip() for m in unikalne_miasta]:
-        dopasowane.append(magnes)
-        print(f"  ✓ '{magnes}' - DOPASOWANE")
-    else:
-        # Szukaj podobnych nazw
-        podobne = [m for m in unikalne_miasta if magnes in m.lower() or m.lower() in magnes]
-        if podobne:
-            print(f"  ? '{magnes}' - NIEDOPASOWANE, ale podobne: {podobne[:3]}")
-        else:
-            print(f"  ✗ '{magnes}' - BRAK ODPOWIEDNIKA")
-        niedopasowane.append(magnes)
-
-print(f"\n  Podsumowanie: {len(dopasowane)} dopasowanych, {len(niedopasowane)} niedopasowanych")
-
+# ── Pobieranie zakładki "Mam magnes" ─────────────────────────────────────
+print("\nPobieram zakładkę 'Mam magnes'...")
+magnesy = pobierz_mam_magnesy(klient_gspread)
 
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
-print("\n" + "="*60)
-print("GENEROWANIE MAPY HTML")
-print("="*60)
+print("\nRozpoczęcie generowania mapy HTML...")
 try:
-    generuj_mape_html(data_rows, moje_magnesy_lista, czas)
+    generuj_mape_html(data_rows, magnesy, czas)
     print("Mapa wygenerowana pomyślnie.")
 except Exception as e:
     import traceback
