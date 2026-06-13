@@ -32,40 +32,6 @@ def polacz_z_arkuszem():
     return dane, log
 
 
-def pobierz_mam_magnesy(klient_gspread):
-    """Pobiera i geokoduje miejscowości z zakładki 'Mam magnes'."""
-    try:
-        arkusz = klient_gspread.open(SPREADSHEET_NAME)
-        try:
-            sheet = arkusz.worksheet("Mam magnes")
-        except gspread.exceptions.WorksheetNotFound:
-            sheet = arkusz.add_worksheet(title="Mam magnes", rows=500, cols=2)
-            sheet.append_row(["Miejscowość", "Data dodania"])
-            print("  Utworzono zakładkę 'Mam magnes'.")
-            return []
-
-        wiersze = sheet.get_all_records()
-        magnesy = []
-        for w in wiersze:
-            nazwa = str(w.get("Miejscowość", "")).strip()
-            if not nazwa:
-                continue
-            # Geokoduj automatycznie
-            zapytanie = f"{nazwa}, Polska"
-            lat, lng = geokoduj(zapytanie)
-            if lat and lng:
-                magnesy.append({"miasto": nazwa, "lat": lat, "lng": lng})
-                print(f"  ✓ {nazwa} -> {lat:.4f}, {lng:.4f}")
-            else:
-                print(f"  ✗ BRAK GEOKODU: {nazwa}")
-
-        print(f"  Geokodowano {len(magnesy)} miejscowości z 'Mam magnes'.")
-        return magnesy
-    except Exception as e:
-        print(f"  UWAGA: Błąd pobierania zakładki 'Mam magnes': {e}")
-        return []
-
-
 # ── Konfiguracja scrapera ─────────────────────────────────────────────────
 data_rows = []
 
@@ -169,15 +135,59 @@ def pobierz_liste_miast():
 geo_cache = {}
 GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 
+
 def oczysc_adres(pelny_adres):
     parts = pelny_adres.split(',')
     if len(parts) > 1:
         return ",".join(parts[1:]).strip()
     return pelny_adres
 
+
+def wczytaj_cache_z_sheets(klient_gspread):
+    """Wczytuje zapisane współrzędne z zakładki 'Geo Cache'."""
+    global geo_cache
+    try:
+        arkusz = klient_gspread.open(SPREADSHEET_NAME)
+        try:
+            sheet = arkusz.worksheet("Geo Cache")
+        except gspread.exceptions.WorksheetNotFound:
+            sheet = arkusz.add_worksheet(title="Geo Cache", rows=5000, cols=3)
+            sheet.append_row(["Adres", "Lat", "Lng"])
+            print("  Utworzono zakładkę 'Geo Cache'.")
+            return sheet
+
+        wiersze = sheet.get_all_records()
+        for w in wiersze:
+            adres = str(w.get("Adres", "")).strip()
+            try:
+                lat = float(str(w.get("Lat", "")).replace(",", "."))
+                lng = float(str(w.get("Lng", "")).replace(",", "."))
+                if adres and lat and lng:
+                    geo_cache[adres] = (lat, lng)
+            except (ValueError, TypeError):
+                continue
+        print(f"  Wczytano {len(geo_cache)} wpisów z cache.")
+        return sheet
+    except Exception as e:
+        print(f"  BŁĄD wczytywania cache: {e}")
+        return None
+
+
+def zapisz_nowe_do_cache(sheet_cache, nowe_wpisy):
+    """Dopisuje tylko nowe wpisy do zakładki 'Geo Cache'."""
+    if not nowe_wpisy or sheet_cache is None:
+        return
+    wiersze = [[adres, lat, lng] for adres, (lat, lng) in nowe_wpisy.items()]
+    for i in range(0, len(wiersze), 100):
+        sheet_cache.append_rows(wiersze[i:i+100])
+    print(f"  Dopisano {len(wiersze)} nowych wpisów do cache.")
+
+
 def geokoduj(pelny_adres):
+    """Geokoduje adres — najpierw sprawdza cache, potem odpytuje API."""
     if pelny_adres in geo_cache:
         return geo_cache[pelny_adres]
+
     for adres in [pelny_adres, oczysc_adres(pelny_adres)]:
         try:
             url = "https://maps.googleapis.com/maps/api/geocode/json"
@@ -185,7 +195,8 @@ def geokoduj(pelny_adres):
                 "address": adres,
                 "key": GOOGLE_MAPS_API_KEY,
                 "region": "pl",
-                "language": "pl"
+                "language": "pl",
+                "components": "country:PL"
             }
             r = requests.get(url, params=params, timeout=10)
             wyniki = r.json()
@@ -196,27 +207,68 @@ def geokoduj(pelny_adres):
                 return lat, lng
         except Exception:
             continue
+
     geo_cache[pelny_adres] = (None, None)
     return None, None
 
 
+def pobierz_mam_magnesy(klient_gspread):
+    """Pobiera i geokoduje miejscowości z zakładki 'Mam magnes'."""
+    try:
+        arkusz = klient_gspread.open(SPREADSHEET_NAME)
+        try:
+            sheet = arkusz.worksheet("Mam magnes")
+        except gspread.exceptions.WorksheetNotFound:
+            sheet = arkusz.add_worksheet(title="Mam magnes", rows=500, cols=2)
+            sheet.append_row(["Miejscowość", "Data dodania"])
+            print("  Utworzono zakładkę 'Mam magnes'.")
+            return []
+
+        wiersze = sheet.get_all_records()
+        magnesy = []
+        for w in wiersze:
+            nazwa = str(w.get("Miejscowość", "")).strip()
+            if not nazwa:
+                continue
+            zapytanie = f"{nazwa}, Polska"
+            lat, lng = geokoduj(zapytanie)
+            if lat and lng:
+                magnesy.append({"miasto": nazwa, "lat": lat, "lng": lng})
+                print(f"  ✓ {nazwa} -> {lat:.4f}, {lng:.4f}")
+            else:
+                print(f"  ✗ BRAK GEOKODU: {nazwa}")
+
+        print(f"  Geokodowano {len(magnesy)} miejscowości z 'Mam magnes'.")
+        return magnesy
+    except Exception as e:
+        print(f"  UWAGA: Błąd pobierania zakładki 'Mam magnes': {e}")
+        return []
+
+
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
-def generuj_mape_html(punkty, magnesy, data_aktualizacji):
+def generuj_mape_html(punkty, magnesy, data_aktualizacji, sheet_cache):
     """Generuje plik index.html z mapą Leaflet.js."""
 
     print("\nGeokodowanie adresów...")
     geokodowane = []
+    nowe_wpisy = {}
+
     for i, p in enumerate(punkty):
         if p["Adres"]:
-            # Wyciągnij tylko nazwę miasta (przed przecinkiem) żeby uniknąć duplikacji
             miasto_krotko = p["Miejscowość"].split(',')[0].strip()
             zapytanie = f"{p['Adres']}, {miasto_krotko}, Polska"
         else:
             miasto_krotko = p["Miejscowość"].split(',')[0].strip()
             zapytanie = f"{miasto_krotko}, Polska"
 
+        bylo_w_cache = zapytanie in geo_cache
         lat, lng = geokoduj(zapytanie)
+
         if lat and lng:
+            # Jeśli to nowy wpis — zapamiętaj do zapisania
+            if not bylo_w_cache:
+                nowe_wpisy[zapytanie] = (lat, lng)
+
             geokodowane.append({
                 "nazwa": p["Punkt"],
                 "adres": p["Adres"],
@@ -231,6 +283,10 @@ def generuj_mape_html(punkty, magnesy, data_aktualizacji):
             print(f"  Geokodowano {i+1}/{len(punkty)}...")
 
     print(f"  Geokodowano {len(geokodowane)}/{len(punkty)} punktów.")
+    print(f"  Nowych wpisów do cache: {len(nowe_wpisy)}")
+
+    # Zapisz nowe wpisy do cache w Sheets
+    zapisz_nowe_do_cache(sheet_cache, nowe_wpisy)
 
     punkty_json = json.dumps(geokodowane, ensure_ascii=False)
     magnesy_json = json.dumps(magnesy, ensure_ascii=False)
@@ -330,7 +386,7 @@ def generuj_mape_html(punkty, magnesy, data_aktualizacji):
       const div = L.DomUtil.create('div', 'legenda');
       div.innerHTML = `
         <div class="legenda-item"><img src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png" style="height:20px"> Punkt sprzedaży</div>
-        <div class="legenda-item" style="margin-top:4px"><span style="font-size:20px">🧲</span> Mam magnes</div>
+        <div class="legenda-item" style="margin-top:4px"><img src="https://raw.githubusercontent.com/biotyt/magnesturysty-scraper/main/Magnes.png" style="height:20px"> Mam magnes</div>
       `;
       return div;
     }};
@@ -415,14 +471,18 @@ czas = datetime.now().strftime("%Y-%m-%d %H:%M")
 arkusz_log.append_row([czas, len(data_rows), f"OK – {len(miasta)} miast"])
 print(f"Zapisano {len(data_rows)} punktów do Google Sheets [{czas}]")
 
-# ── Pobieranie zakładki "Mam magnes" ─────────────────────────────────────
+# ── Wczytaj cache geokodowania ────────────────────────────────────────────
+print("\nWczytuję cache geokodowania...")
+sheet_cache = wczytaj_cache_z_sheets(klient_gspread)
+
+# ── Pobierz zakładkę "Mam magnes" ────────────────────────────────────────
 print("\nPobieram zakładkę 'Mam magnes'...")
 magnesy = pobierz_mam_magnesy(klient_gspread)
 
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
 print("\nRozpoczęcie generowania mapy HTML...")
 try:
-    generuj_mape_html(data_rows, magnesy, czas)
+    generuj_mape_html(data_rows, magnesy, czas, sheet_cache)
     print("Mapa wygenerowana pomyślnie.")
 except Exception as e:
     import traceback
