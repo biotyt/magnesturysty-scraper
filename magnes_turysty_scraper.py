@@ -29,7 +29,12 @@ def polacz_z_arkuszem():
         log = arkusz.worksheet("Log")
     except gspread.exceptions.WorksheetNotFound:
         log = arkusz.add_worksheet(title="Log", rows=1000, cols=3)
-    return dane, log
+    try:
+        moje_magnesy = arkusz.worksheet("Moje magnesy")
+    except gspread.exceptions.WorksheetNotFound:
+        moje_magnesy = arkusz.add_worksheet(title="Moje magnesy", rows=1000, cols=2)
+        moje_magnesy.append_row(["Miejscowość", "Data dodania"])
+    return dane, log, moje_magnesy
 
 
 # ── Konfiguracja scrapera ─────────────────────────────────────────────────
@@ -170,7 +175,7 @@ def geokoduj(pelny_adres):
 
 
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
-def generuj_mape_html(punkty, data_aktualizacji):
+def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
     """Generuje plik index.html z mapą Leaflet.js."""
 
     print("\nGeokodowanie adresów...")
@@ -183,12 +188,15 @@ def generuj_mape_html(punkty, data_aktualizacji):
 
         lat, lng = geokoduj(zapytanie)
         if lat and lng:
+            # Sprawdź czy ta miejscowość jest w liście "Moje magnesy"
+            posiada_magnes = p["Miejscowość"].lower() in moje_magnesy
             geokodowane.append({
                 "nazwa": p["Punkt"],
                 "adres": p["Adres"],
                 "miasto": p["Miejscowość"],
                 "lat": lat,
-                "lng": lng
+                "lng": lng,
+                "posiadam": posiada_magnes
             })
         else:
             print(f"  BRAK GEOKODU: {p['Punkt']} | {p['Adres']} | {p['Miejscowość']}")
@@ -223,6 +231,9 @@ def generuj_mape_html(punkty, data_aktualizacji):
     .popup-nazwa {{ font-weight: 600; font-size: 14px; margin-bottom: 4px; }}
     .popup-adres {{ font-size: 13px; color: #555; }}
     .popup-miasto {{ font-size: 12px; color: #888; margin-top: 2px; }}
+    .popup-status {{ font-size: 12px; margin-top: 4px; padding: 4px 8px; border-radius: 4px; display: inline-block; }}
+    .popup-status.posiadam {{ background: #d4edda; color: #155724; }}
+    .popup-status.brak {{ background: #f8d7da; color: #721c24; }}
   </style>
 </head>
 <body>
@@ -247,29 +258,48 @@ def generuj_mape_html(punkty, data_aktualizacji):
       maxZoom: 19
     }}).addTo(map);
 
-    const icon = L.icon({
+    // Ikona dla punktów bez magnesu (standardowa niebieska pinezka)
+    const iconStandard = L.icon({{
       iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
       shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
       iconSize: [25, 41],
       iconAnchor: [12, 41],
       popupAnchor: [1, -34]
-    });
+    }});
+
+    // Ikona dla punktów z magnesem (Twój obrazek z GitHub - 48x32 px)
+    const iconPosiadam = L.icon({{
+      iconUrl: 'https://raw.githubusercontent.com/biotyt/magnes-turysty/main/Magnes.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+      iconSize: [48, 32],
+      iconAnchor: [24, 32],
+      popupAnchor: [1, -34]
+    }});
 
     const cluster = L.markerClusterGroup({{ maxClusterRadius: 40 }});
     const wszystkieMarkery = [];
 
     punkty.forEach(p => {{
+      const icon = p.posiadam ? iconPosiadam : iconStandard;
+      const statusHtml = p.posiadam 
+        ? '<div class="popup-status posiadam">✓ Posiadam magnes</div>'
+        : '<div class="popup-status brak">Brak magnesu</div>';
+      
       const marker = L.marker([p.lat, p.lng], {{icon}})
         .bindPopup(`<div class="popup-nazwa">${{p.nazwa}}</div>
           <div class="popup-adres">${{p.adres || '–'}}</div>
-          <div class="popup-miasto">${{p.miasto}}</div>`);
+          <div class="popup-miasto">${{p.miasto}}</div>
+          ${{statusHtml}}`);
       marker._dane = p;
       cluster.addLayer(marker);
       wszystkieMarkery.push(marker);
     }});
 
     map.addLayer(cluster);
-    document.getElementById('counter').textContent = punkty.length + ' punktów';
+    
+    const ilePosiadam = punkty.filter(p => p.posiadam).length;
+    document.getElementById('counter').textContent = 
+      punkty.length + ' punktów (' + ilePosiadam + ' z magnesem)';
 
     document.getElementById('search').addEventListener('input', function() {{
       const q = this.value.toLowerCase().trim();
@@ -281,7 +311,10 @@ def generuj_mape_html(punkty, data_aktualizacji):
             (m._dane.adres && m._dane.adres.toLowerCase().includes(q)))
         : wszystkieMarkery;
       pasujace.forEach(m => cluster.addLayer(m));
-      document.getElementById('counter').textContent = pasujace.length + ' punktów';
+      
+      const ilePosiadamFiltr = pasujace.filter(m => m._dane.posiadam).length;
+      document.getElementById('counter').textContent = 
+        pasujace.length + ' punktów (' + ilePosiadamFiltr + ' z magnesem)';
     }});
   </script>
 </body>
@@ -332,7 +365,7 @@ for index, pozycja in enumerate(miasta):
 
 # ── Zapis do Google Sheets ────────────────────────────────────────────────
 print("\nŁączę z Google Sheets...")
-arkusz_dane, arkusz_log = polacz_z_arkuszem()
+arkusz_dane, arkusz_log, arkusz_moje_magnesy = polacz_z_arkuszem()
 arkusz_dane.clear()
 naglowki = ["Miejscowość", "Punkt", "Adres", "Pełny zapis (Miasto, Adres)"]
 arkusz_dane.append_row(naglowki)
@@ -348,10 +381,24 @@ arkusz_log.append_row([czas, len(data_rows), f"OK – {len(miasta)} miast"])
 print(f"Zapisano {len(data_rows)} punktów do Google Sheets [{czas}]")
 
 
+# ── Odczyt "Moje magnesy" ─────────────────────────────────────────────────
+print("\nOdczytuję listę 'Moje magnesy'...")
+moje_magnesy_lista = set()
+try:
+    dane_moje = arkusz_moje_magnesy.get_all_values()
+    # Pomijamy nagłówek
+    for wiersz in dane_moje[1:]:
+        if wiersz and wiersz[0].strip():
+            moje_magnesy_lista.add(wiersz[0].strip().lower())
+    print(f"  Znaleziono {len(moje_magnesy_lista)} miejscowości z magnesami")
+except Exception as e:
+    print(f"  Błąd odczytu 'Moje magnesy': {e}")
+
+
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
 print("\nRozpoczęcie generowania mapy HTML...")
 try:
-    generuj_mape_html(data_rows, czas)
+    generuj_mape_html(data_rows, moje_magnesy_lista, czas)
     print("Mapa wygenerowana pomyślnie.")
 except Exception as e:
     import traceback
