@@ -269,7 +269,7 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
 
     // Ikona dla punktów z magnesem (Twój obrazek z GitHub - 48x32 px)
     const iconPosiadam = L.icon({{
-      iconUrl: 'https://raw.githubusercontent.com/biotyt/magnes-turysty/main/Magnes.png',
+      iconUrl: 'https://raw.githubusercontent.com/biotyt/magnesturysty-scraper/main/Magnes.png',
       shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
       iconSize: [48, 32],
       iconAnchor: [24, 32],
