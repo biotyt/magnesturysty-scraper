@@ -13,23 +13,25 @@
     #header { background: #2c3e50; color: white; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
     #header h1 { font-size: 16px; font-weight: 500; }
     #header span { font-size: 12px; opacity: 0.7; }
-    #search-bar { padding: 10px 16px; background: white; border-bottom: 1px solid #e0e0e0; display: flex; gap: 8px; }
+    #search-bar { padding: 10px 16px; background: white; border-bottom: 1px solid #e0e0e0; display: flex; gap: 8px; align-items: center; }
     #search { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; }
     #search:focus { border-color: #2980b9; }
-    #counter { font-size: 13px; color: #666; display: flex; align-items: center; white-space: nowrap; }
+    #counter { font-size: 13px; color: #666; white-space: nowrap; }
     #map { width: 100%; height: calc(100vh - 96px); }
     .popup-nazwa { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
     .popup-adres { font-size: 13px; color: #555; }
     .popup-miasto { font-size: 12px; color: #888; margin-top: 2px; }
-    .popup-status { font-size: 12px; margin-top: 4px; padding: 4px 8px; border-radius: 4px; display: inline-block; }
-    .popup-status.posiadam { background: #d4edda; color: #155724; }
-    .popup-status.brak { background: #f8d7da; color: #721c24; }
+    .popup-magnes { font-size: 13px; color: #c0392b; font-weight: 500; margin-top: 4px; }
+    .legenda { position: absolute; bottom: 30px; right: 10px; z-index: 1000; background: white;
+                padding: 10px 14px; border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.2);
+                font-size: 13px; line-height: 1.8; }
+    .legenda-item { display: flex; align-items: center; gap: 8px; }
   </style>
 </head>
 <body>
   <div id="header">
     <h1>📍 MagnesTurysty – Punkty sprzedaży</h1>
-    <span>Aktualizacja: 2026-06-13 21:11</span>
+    <span>Aktualizacja: 2026-06-13 21:21</span>
   </div>
   <div id="search-bar">
     <input id="search" type="text" placeholder="Szukaj miejscowości lub punktu..."/>
@@ -40,7 +42,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
   <script>
-    const punkty = [{"nazwa": "Kryta Pływalnia", "adres": "ul. J. Wojciechowskiego 1a", "miasto": "Barcin, kujawsko-pomorskie", "lat": 52.8554713, "lng": 17.9315613, "posiadam": false}, {"nazwa": "Stanica Żeglarska Neptun – wypożyczalnia sprzętu wodnego i rowerowego", "adres": "ul. Wyzwolenia 2", "miasto": "Barcin, kujawsko-pomorskie", "lat": 52.8642772, "lng": 17.9441083, "posiadam": false}, {"nazwa": "Centrum Informacji Turystycznej w Barlinku", "adres": "ul. Paderewskiego 7", "miasto": "Barlinek, zachodniopomorskie", "lat": 52.9932318, "lng": 15.2186614, "posiadam": false}, {"nazwa": "PGE GIGANTY MOCY sklepik przy Muzeum Nauk", "adres": "Plac Narutowicza 3", "miasto": "Bełchatów, łódzkie", "lat": 51.3668586, "lng": 19.3723535, "posiadam": false}, {"nazwa": "Informacja Turystyczna w Bełchatowie", "adres": "ul. Kościuszki 15", "miasto": "Bełchatów, łódzkie", "lat": 51.3652831, "lng": 19.369525, "posiadam": false}, {"nazwa": "PREZENCIARNIA Galeria OLIMPIA", "adres": "ul. Kolejowa 6", "miasto": "Bełchatów, łódzkie", "lat": 51.3529585, "lng": 19.3755248, "posiadam": false}, {"nazwa": "Stacja Paliw Star Oil LPG", "adres": "ul. Czapliniecka 75", "miasto": "Bełchatów, łódzkie", "lat": 51.369367, "lng": 19.3562167, "posiadam": false}, {"nazwa": "U P O M I N E K – tu kupisz Zamek w Mosznej", "adres": "Rynek 22/U3", "miasto": "Biała, opolskie", "lat": 50.38567190000001, "lng": 17.6594897, "posiadam": false}, {"nazwa": "Centrum Informacji Turystycznej i Kulturalnej w Białej Podlaskiej", "adres": "Plac Wolności 10", "miasto": "Biała Podlaska, lubelskie", "lat": 52.0343888, "lng": 23.1187402, "posiadam": false}, {"nazwa": "🟡 PEGAS Grupa, Bracia Maliszewscy – stacja paliw", "adres": "ul. Topolowa 5a", "miasto": "Biała Rawska, łódzkie", "lat": 51.8127571, "lng": 20.4710362, "posiadam": false}, {"nazwa": "Białobrzeskie Centrum Kultury „Białe Brzegi”", "adres": "ul. Kościelna 31", "miasto": "Białobrzegi, mazowieckie", "lat": 51.6490799, "lng": 20.9495503, "posiadam": false}, {"nazwa": "Ośrodek Wypoczynkowy „Na Plaży”", "adres": "ul. Sądowa 31", "miasto": "Biały Bór, zachodniopomorskie", "lat": 53.9056821, "lng": 16.8281729, "posiadam": false}, {"nazwa": "Dom z Basztą", "adres": "ul. Węgierska 1", "miasto": "Biecz, małopolskie", "lat": 49.72994, "lng": 21.2475228, "posiadam": false}, {"nazwa": "K R O M E R Ó W K A", "adres": "ul. Kromera 3", "miasto": "Biecz, małopolskie", "lat": 49.7304593, "lng": 21.2481736, "posiadam": false}, {"nazwa": "Muzeum Ziemi Biłgorajskiej w Biłgoraju", "adres": "ul. Kościuszki 87", "miasto": "Biłgoraj, lubelskie", "lat": 50.5317235, "lng": 22.7180029, "posiadam": false}, {"nazwa": "Zagroda Sitarska – placówka muzealna", "adres": "ul. Nadstawna 32", "miasto": "Biłgoraj, lubelskie", "lat": 50.5392705, "lng": 22.7188684, "posiadam": false}, {"nazwa": "Zespół Młyński – placówka muzealna", "adres": "ul. Czerwonego Krzyża 37", "miasto": "Biłgoraj, lubelskie", "lat": 50.5332121, "lng": 22.7132688, "posiadam": false}, {"nazwa": "Książnica Polska – Księgarnia Kropka", "adres": "ul. Floriańska 2", "miasto": "Biskupiec, warmińsko-mazurskie", "lat": 53.8646478, "lng": 20.9539203, "posiadam": false}, {"nazwa": "💐Kwiaciarnia „Kwiatowe Fantazje”", "adres": "ul. Sieradzka 6", "miasto": "Błaszki, łódzkie", "lat": 51.6513585, "lng": 18.4357395, "posiadam": false}, {"nazwa": "Błońskie Starocia – sklep z antykami", "adres": "Rynek 14, 05-870", "miasto": "Błonie, mazowieckie", "lat": 52.1949356, "lng": 20.6163176, "posiadam": false}, {"nazwa": "Galeria Koronki Klockowej", "adres": "ul. Grunwaldzka 18", "miasto": "Bobowa, małopolskie", "lat": 49.7085394, "lng": 20.9443805, "posiadam": false}, {"nazwa": "Punkt Informacji Turystycznej", "adres": "Rynek 24", "miasto": "Bobowa, małopolskie", "lat": 49.7077694, "lng": 20.9424938, "posiadam": false}, {"nazwa": "Biblioteka Publiczna w Broku", "adres": "ul. Pułtuska 22", "miasto": "Brok, mazowieckie", "lat": 52.70037439999999, "lng": 21.8627303, "posiadam": false}, {"nazwa": "Sklep Wielobranżowy", "adres": "ul. Droga Lisia 60", "miasto": "Borek Wielkopolski, wielkopolskie", "lat": 51.9140561, "lng": 17.2383275, "posiadam": false}, {"nazwa": "Biblioteka przy Miejsko-Gminnym Ośrodku Kultury", "adres": "Rynek Kościuszki 14", "miasto": "Bolimów, łódzkie", "lat": 52.0756461, "lng": 20.1651852, "posiadam": false}, {"nazwa": "Księgarnia Powszechna, zabawki, porcelana, świat kawy i herbaty", "adres": "ul. Daszyńskiego 9", "miasto": "Bogatynia, dolnośląskie", "lat": 50.9049155, "lng": 14.9575528, "posiadam": false}, {"nazwa": "KIOSK handel obwoźny (art. spożywcze i przemysłowe)", "adres": "ul. Żołnierzy II Armii Wojska Polskiego 3A", "miasto": "Bogatynia, dolnośląskie", "lat": 50.9072496, "lng": 14.9561498, "posiadam": false}, {"nazwa": "Kwiaciarnia ROSA", "adres": "ul. Kościelna 1", "miasto": "Bytom Odrzański, lubuskie", "lat": 51.730106, "lng": 15.827346, "posiadam": false}, {"nazwa": "WELESOWY KRAM", "adres": "", "miasto": "Byczyna, opolskie", "lat": 51.11327, "lng": 18.21114, "posiadam": false}, {"nazwa": "„M a ł p k a”", "adres": "Rynek 13", "miasto": "Byczyna, opolskie", "lat": 51.11443999999999, "lng": 18.2139255, "posiadam": false}];
+    const punkty = [{"nazwa": "Kryta Pływalnia", "adres": "ul. J. Wojciechowskiego 1a", "miasto": "Barcin, kujawsko-pomorskie", "lat": 52.8554713, "lng": 17.9315613}, {"nazwa": "Stanica Żeglarska Neptun – wypożyczalnia sprzętu wodnego i rowerowego", "adres": "ul. Wyzwolenia 2", "miasto": "Barcin, kujawsko-pomorskie", "lat": 52.8642772, "lng": 17.9441083}, {"nazwa": "Centrum Informacji Turystycznej w Barlinku", "adres": "ul. Paderewskiego 7", "miasto": "Barlinek, zachodniopomorskie", "lat": 52.9932318, "lng": 15.2186614}, {"nazwa": "PGE GIGANTY MOCY sklepik przy Muzeum Nauk", "adres": "Plac Narutowicza 3", "miasto": "Bełchatów, łódzkie", "lat": 51.3668586, "lng": 19.3723535}, {"nazwa": "Informacja Turystyczna w Bełchatowie", "adres": "ul. Kościuszki 15", "miasto": "Bełchatów, łódzkie", "lat": 51.3652831, "lng": 19.369525}, {"nazwa": "PREZENCIARNIA Galeria OLIMPIA", "adres": "ul. Kolejowa 6", "miasto": "Bełchatów, łódzkie", "lat": 51.3529585, "lng": 19.3755248}, {"nazwa": "Stacja Paliw Star Oil LPG", "adres": "ul. Czapliniecka 75", "miasto": "Bełchatów, łódzkie", "lat": 51.369367, "lng": 19.3562167}, {"nazwa": "U P O M I N E K – tu kupisz Zamek w Mosznej", "adres": "Rynek 22/U3", "miasto": "Biała, opolskie", "lat": 50.38567190000001, "lng": 17.6594897}, {"nazwa": "Centrum Informacji Turystycznej i Kulturalnej w Białej Podlaskiej", "adres": "Plac Wolności 10", "miasto": "Biała Podlaska, lubelskie", "lat": 52.0343888, "lng": 23.1187402}, {"nazwa": "🟡 PEGAS Grupa, Bracia Maliszewscy – stacja paliw", "adres": "ul. Topolowa 5a", "miasto": "Biała Rawska, łódzkie", "lat": 51.8127571, "lng": 20.4710362}, {"nazwa": "Białobrzeskie Centrum Kultury „Białe Brzegi”", "adres": "ul. Kościelna 31", "miasto": "Białobrzegi, mazowieckie", "lat": 51.6490799, "lng": 20.9495503}, {"nazwa": "Ośrodek Wypoczynkowy „Na Plaży”", "adres": "ul. Sądowa 31", "miasto": "Biały Bór, zachodniopomorskie", "lat": 53.9056821, "lng": 16.8281729}, {"nazwa": "Dom z Basztą", "adres": "ul. Węgierska 1", "miasto": "Biecz, małopolskie", "lat": 49.72994, "lng": 21.2475228}, {"nazwa": "K R O M E R Ó W K A", "adres": "ul. Kromera 3", "miasto": "Biecz, małopolskie", "lat": 49.7304593, "lng": 21.2481736}, {"nazwa": "Muzeum Ziemi Biłgorajskiej w Biłgoraju", "adres": "ul. Kościuszki 87", "miasto": "Biłgoraj, lubelskie", "lat": 50.5317235, "lng": 22.7180029}, {"nazwa": "Zagroda Sitarska – placówka muzealna", "adres": "ul. Nadstawna 32", "miasto": "Biłgoraj, lubelskie", "lat": 50.5392705, "lng": 22.7188684}, {"nazwa": "Zespół Młyński – placówka muzealna", "adres": "ul. Czerwonego Krzyża 37", "miasto": "Biłgoraj, lubelskie", "lat": 50.5332121, "lng": 22.7132688}, {"nazwa": "Książnica Polska – Księgarnia Kropka", "adres": "ul. Floriańska 2", "miasto": "Biskupiec, warmińsko-mazurskie", "lat": 53.8646478, "lng": 20.9539203}, {"nazwa": "💐Kwiaciarnia „Kwiatowe Fantazje”", "adres": "ul. Sieradzka 6", "miasto": "Błaszki, łódzkie", "lat": 51.6513585, "lng": 18.4357395}, {"nazwa": "Błońskie Starocia – sklep z antykami", "adres": "Rynek 14, 05-870", "miasto": "Błonie, mazowieckie", "lat": 52.1949356, "lng": 20.6163176}, {"nazwa": "Galeria Koronki Klockowej", "adres": "ul. Grunwaldzka 18", "miasto": "Bobowa, małopolskie", "lat": 49.7085394, "lng": 20.9443805}, {"nazwa": "Punkt Informacji Turystycznej", "adres": "Rynek 24", "miasto": "Bobowa, małopolskie", "lat": 49.7077694, "lng": 20.9424938}, {"nazwa": "Biblioteka Publiczna w Broku", "adres": "ul. Pułtuska 22", "miasto": "Brok, mazowieckie", "lat": 52.70037439999999, "lng": 21.8627303}, {"nazwa": "Sklep Wielobranżowy", "adres": "ul. Droga Lisia 60", "miasto": "Borek Wielkopolski, wielkopolskie", "lat": 51.9140561, "lng": 17.2383275}, {"nazwa": "Biblioteka przy Miejsko-Gminnym Ośrodku Kultury", "adres": "Rynek Kościuszki 14", "miasto": "Bolimów, łódzkie", "lat": 52.0756461, "lng": 20.1651852}, {"nazwa": "Księgarnia Powszechna, zabawki, porcelana, świat kawy i herbaty", "adres": "ul. Daszyńskiego 9", "miasto": "Bogatynia, dolnośląskie", "lat": 50.9049155, "lng": 14.9575528}, {"nazwa": "KIOSK handel obwoźny (art. spożywcze i przemysłowe)", "adres": "ul. Żołnierzy II Armii Wojska Polskiego 3A", "miasto": "Bogatynia, dolnośląskie", "lat": 50.9072496, "lng": 14.9561498}, {"nazwa": "Kwiaciarnia ROSA", "adres": "ul. Kościelna 1", "miasto": "Bytom Odrzański, lubuskie", "lat": 51.730106, "lng": 15.827346}, {"nazwa": "WELESOWY KRAM", "adres": "", "miasto": "Byczyna, opolskie", "lat": 51.11327, "lng": 18.21114}, {"nazwa": "„M a ł p k a”", "adres": "Rynek 13", "miasto": "Byczyna, opolskie", "lat": 51.11443999999999, "lng": 18.2139255}];
+    const magnesy = [];
 
     const map = L.map('map').setView([52.0, 19.5], 6);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -48,48 +51,54 @@
       maxZoom: 19
     }).addTo(map);
 
-    // Ikona dla punktów bez magnesu (standardowa niebieska pinezka)
-    const iconStandard = L.icon({
+    const iconPunkt = L.icon({
       iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
       shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34]
+      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
     });
 
-    // Ikona dla punktów z magnesem (Twój obrazek z GitHub - 48x32 px)
-    const iconPosiadam = L.icon({
-      iconUrl: 'https://raw.githubusercontent.com/twojanazwa/magnes-turysty/main/Magnes.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-      iconSize: [48, 32],
-      iconAnchor: [24, 32],
-      popupAnchor: [1, -34]
+    const iconMagnes = L.divIcon({
+      html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.4));">🧲</div>',
+      className: '',
+      iconSize: [26, 26],
+      iconAnchor: [13, 26],
+      popupAnchor: [0, -28]
     });
 
     const cluster = L.markerClusterGroup({ maxClusterRadius: 40 });
     const wszystkieMarkery = [];
 
     punkty.forEach(p => {
-      const icon = p.posiadam ? iconPosiadam : iconStandard;
-      const statusHtml = p.posiadam 
-        ? '<div class="popup-status posiadam">✓ Posiadam magnes</div>'
-        : '<div class="popup-status brak">Brak magnesu</div>';
-      
-      const marker = L.marker([p.lat, p.lng], {icon})
+      const marker = L.marker([p.lat, p.lng], {icon: iconPunkt})
         .bindPopup(`<div class="popup-nazwa">${p.nazwa}</div>
           <div class="popup-adres">${p.adres || '–'}</div>
-          <div class="popup-miasto">${p.miasto}</div>
-          ${statusHtml}`);
+          <div class="popup-miasto">${p.miasto}</div>`);
       marker._dane = p;
       cluster.addLayer(marker);
       wszystkieMarkery.push(marker);
     });
 
     map.addLayer(cluster);
-    
-    const ilePosiadam = punkty.filter(p => p.posiadam).length;
-    document.getElementById('counter').textContent = 
-      punkty.length + ' punktów (' + ilePosiadam + ' z magnesem)';
+
+    magnesy.forEach(m => {
+      L.marker([m.lat, m.lng], {icon: iconMagnes, zIndexOffset: 1000})
+        .addTo(map)
+        .bindPopup(`<div class="popup-nazwa">${m.miasto}</div>
+          <div class="popup-magnes">🧲 Mam magnes z tej miejscowości!</div>`);
+    });
+
+    document.getElementById('counter').textContent = punkty.length + ' punktów';
+
+    const legenda = L.control({position: 'bottomright'});
+    legenda.onAdd = () => {
+      const div = L.DomUtil.create('div', 'legenda');
+      div.innerHTML = `
+        <div class="legenda-item"><img src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png" style="height:20px"> Punkt sprzedaży</div>
+        <div class="legenda-item" style="margin-top:4px"><span style="font-size:20px">🧲</span> Mam magnes</div>
+      `;
+      return div;
+    };
+    legenda.addTo(map);
 
     document.getElementById('search').addEventListener('input', function() {
       const q = this.value.toLowerCase().trim();
@@ -101,10 +110,7 @@
             (m._dane.adres && m._dane.adres.toLowerCase().includes(q)))
         : wszystkieMarkery;
       pasujace.forEach(m => cluster.addLayer(m));
-      
-      const ilePosiadamFiltr = pasujace.filter(m => m._dane.posiadam).length;
-      document.getElementById('counter').textContent = 
-        pasujace.length + ' punktów (' + ilePosiadamFiltr + ' z magnesem)';
+      document.getElementById('counter').textContent = pasujace.length + ' punktów';
     });
   </script>
 </body>
