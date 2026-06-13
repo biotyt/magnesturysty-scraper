@@ -32,6 +32,9 @@ jobs:
       - name: Utwórz plik credentials z Secret
         run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > google_credentials.json
 
+      - name: Ustaw klucz Google Maps
+        run: echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> $GITHUB_ENV
+
       - name: Uruchom scraper i wygeneruj mapę
         run: python magnes_turysty_scraper.py
 
