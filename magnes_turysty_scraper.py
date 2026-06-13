@@ -193,6 +193,8 @@ def generuj_mape_html(punkty, data_aktualizacji):
                 "lat": lat,
                 "lng": lng
             })
+        else:
+            print(f"  BRAK GEOKODU: {p['Punkt']} | {p['Adres']} | {p['Miejscowość']}")
 
         if (i + 1) % 50 == 0:
             print(f"  Geokodowano {i+1}/{len(punkty)}...")
