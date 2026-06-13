@@ -178,11 +178,37 @@ def geokoduj(pelny_adres):
 def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
     """Generuje plik index.html z mapą Leaflet.js."""
 
-    print("\nGeokodowanie adresów...")
-    print(f"  Lista 'Moje magnesy' zawiera {len(moje_magnesy)} miejscowości:")
-    for miasto in sorted(moje_magnesy):
-        print(f"    - {miasto}")
+    print("\n" + "="*70)
+    print("DIAGNOSTYKA - JAK NAZYWAJĄ SIĘ MIASTA W SCRAPERZE")
+    print("="*70)
+    print("Skopiuj poniższe nazwy do arkusza 'Moje magnesy' (z województwami):")
+    print()
     
+    # Pobierz unikalne miasta ze scrapera
+    unikalne_miasta = sorted(set(p["Miejscowość"] for p in punkty))
+    
+    # Pokaż miasta, które masz w arkuszu (żebyś wiedział które dodać)
+    print("TWOJE MAGNESY (z arkusza):")
+    for magnes in sorted(moje_magnesy):
+        # Znajdź pasujące miasta w scraperze
+        pasujace = [m for m in unikalne_miasta if m.lower().startswith(magnes + " ") or m.lower() == magnes]
+        if pasujace:
+            print(f"  '{magnes}' -> {pasujace[0]}")
+        else:
+            print(f"  '{magnes}' -> NIE MA W SCRAPERZE!")
+    
+    print()
+    print("WSZYSTKIE DOSTĘPNE MIASTA W SCRAPERZE (pierwsze 50):")
+    for i, miasto in enumerate(unikalne_miasta[:50], 1):
+        print(f"  {i:3d}. {miasto}")
+    if len(unikalne_miasta) > 50:
+        print(f"  ... i {len(unikalne_miasta) - 50} więcej")
+    
+    print()
+    print("="*70)
+    print()
+    
+    print("Geokodowanie adresów...")
     geokodowane = []
     dopasowane_magnesy = set()
     
@@ -196,7 +222,18 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
         if lat and lng:
             # Sprawdź czy ta miejscowość jest w liście "Moje magnesy"
             miasto_lower = p["Miejscowość"].lower().strip()
-            posiada_magnes = miasto_lower in moje_magnesy
+            
+            posiada_magnes = False
+            for magnes in moje_magnesy:
+                magnes_lower = magnes.lower().strip()
+                # Dokładne dopasowanie (jeśli dodałeś województwo do arkusza)
+                if magnes_lower == miasto_lower:
+                    posiada_magnes = True
+                    break
+                # Dopasowanie bez województwa (fallback)
+                if miasto_lower.startswith(magnes_lower + " ") or miasto_lower.startswith(magnes_lower + "-"):
+                    posiada_magnes = True
+                    break
             
             if posiada_magnes:
                 dopasowane_magnesy.add(miasto_lower)
@@ -216,15 +253,11 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
             print(f"  Geokodowano {i+1}/{len(punkty)}...")
 
     print(f"  Geokodowano {len(geokodowane)}/{len(punkty)} punktów.")
-    print(f"  Dopasowano {len(dopasowane_magnesy)} z {len(moje_magnesy)} magnesów:")
-    for miasto in sorted(dopasowane_magnesy):
-        print(f"    ✓ {miasto}")
-    
-    niedopasowane = moje_magnesy - dopasowane_magnesy
-    if niedopasowane:
-        print(f"  NIEDOPASOWANE magnesy ({len(niedopasowane)}):")
-        for miasto in sorted(niedopasowane):
-            print(f"    ✗ {miasto}")
+    print(f"  Dopasowano {len(dopasowane_magnesy)} punktów z magnesem")
+    if dopasowane_magnesy:
+        print(f"  Przykłady dopasowanych:")
+        for m in sorted(dopasowane_magnesy)[:10]:
+            print(f"    ✓ {m}")
 
     punkty_json = json.dumps(geokodowane, ensure_ascii=False)
 
@@ -343,7 +376,6 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html)
     print("Wygenerowano index.html")
-
 
 # ── Główna pętla scrapera ──────────────────────────────────────────────────
 miasta = pobierz_liste_miast()[:20]
