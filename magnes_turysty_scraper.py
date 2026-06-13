@@ -346,7 +346,7 @@ def generuj_mape_html(punkty, moje_magnesy, data_aktualizacji):
 
 
 # ── Główna pętla scrapera ──────────────────────────────────────────────────
-miasta = pobierz_liste_miast()
+miasta = pobierz_liste_miast()[:20]
 print(f"Pobrano {len(miasta)} miast. Zaczynam analizę...")
 
 for index, pozycja in enumerate(miasta):
@@ -409,12 +409,11 @@ moje_magnesy_lista = set()
 try:
     dane_moje = arkusz_moje_magnesy.get_all_values()
     print(f"  Surowe dane z arkusza ({len(dane_moje)} wierszy):")
-    for i, wiersz in enumerate(dane_moje[:10]):  # Pokaż pierwsze 10 wierszy
+    for i, wiersz in enumerate(dane_moje[:10]):
         print(f"    Wiersz {i}: {wiersz}")
     if len(dane_moje) > 10:
         print(f"    ... i {len(dane_moje) - 10} więcej wierszy")
     
-    # Pomijamy nagłówek
     for wiersz in dane_moje[1:]:
         if wiersz and len(wiersz) > 0 and wiersz[0].strip():
             miasto = wiersz[0].strip().lower()
@@ -429,6 +428,48 @@ except Exception as e:
     print(f"  BŁĄD odczytu 'Moje magnesy': {e}")
     import traceback
     traceback.print_exc()
+
+
+# ── Analiza nazw miejscowości ze scrapera ─────────────────────────────────
+print("\n" + "="*60)
+print("ANALIZA NAZW MIEJSCOWOŚCI ZE SCRAPERA")
+print("="*60)
+unikalne_miasta = set()
+for p in data_rows:
+    unikalne_miasta.add(p["Miejscowość"])
+
+print(f"  Unikalne miejscowości ze scrapera ({len(unikalne_miasta)}):")
+for miasto in sorted(unikalne_miasta)[:50]:
+    print(f"    - '{miasto}' -> '{miasto.lower().strip()}'")
+if len(unikalne_miasta) > 50:
+    print(f"    ... i {len(unikalne_miasta) - 50} więcej")
+
+
+# ── Porównanie i testowanie dopasowania ───────────────────────────────────
+print("\n" + "="*60)
+print("TESTOWANIE DOPASOWANIA")
+print("="*60)
+print(f"  Sprawdzam czy magnesy z arkusza pasują do danych ze scrapera...")
+print()
+
+dopasowane = []
+niedopasowane = []
+
+for magnes in sorted(moje_magnesy_lista):
+    # Szukaj dokładnego dopasowania
+    if magnes in [m.lower().strip() for m in unikalne_miasta]:
+        dopasowane.append(magnes)
+        print(f"  ✓ '{magnes}' - DOPASOWANE")
+    else:
+        # Szukaj podobnych nazw
+        podobne = [m for m in unikalne_miasta if magnes in m.lower() or m.lower() in magnes]
+        if podobne:
+            print(f"  ? '{magnes}' - NIEDOPASOWANE, ale podobne: {podobne[:3]}")
+        else:
+            print(f"  ✗ '{magnes}' - BRAK ODPOWIEDNIKA")
+        niedopasowane.append(magnes)
+
+print(f"\n  Podsumowanie: {len(dopasowane)} dopasowanych, {len(niedopasowane)} niedopasowanych")
 
 
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
