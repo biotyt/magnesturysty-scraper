@@ -17,6 +17,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
+
 def polacz_z_arkuszem():
     creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
     klient = gspread.authorize(creds)
@@ -107,27 +108,32 @@ def pobierz_nazwe_miasta(soup):
 
 
 def pobierz_liste_miast():
-    url = "https://magnesturysty.pl/page-sitemap.xml"
+    """Pobiera listę miast ze strony głównej magnesturysty.pl."""
+    url = "https://magnesturysty.pl/"
     try:
         response = session.get(url, headers=headers, timeout=20)
-        soup = BeautifulSoup(response.content, 'html.parser')
+        soup = BeautifulSoup(response.text, 'html.parser')
         linki = []
-        for loc in soup.find_all('loc'):
-            adres = loc.text.strip()
-            if any(x in adres for x in [".png", ".jpg", "/sklep", "/kontakt",
-                                         "/regulamin", "/polityka",
-                                         "/miejscowosci", "/o-nas", "/o-projekcie"]):
+        seen = set()
+        for a in soup.find_all('a', class_='map_link'):
+            href = (a.get('href') or '').strip()
+            href = href.replace('https://www.magnesturysty.pl/', 'https://magnesturysty.pl/')
+            if not href.startswith('https://magnesturysty.pl/'):
                 continue
-            slug = adres.strip('/').split('/')[-1]
-            if len(slug) <= 3:
+            href = href.split('?')[0]
+            if not href.endswith('/'):
+                href += '/'
+            slug = href.strip('/').split('/')[-1]
+            if len(slug) <= 3 or 'magnesturysty' in slug.lower():
                 continue
-            if 'magnesturysty' in slug.lower():
-                continue
-            nazwa = slug.replace('-', ' ').title()
-            linki.append({"url": adres, "miasto": nazwa})
+            if href not in seen:
+                seen.add(href)
+                nazwa = a.get_text(strip=True).lstrip('*')
+                linki.append({"url": href, "miasto": nazwa})
+        print(f"Znaleziono {len(linki)} miast ze strony głównej.")
         return linki
     except Exception as e:
-        print(f"Błąd sitemap: {e}")
+        print(f"Błąd pobierania miast: {e}")
         return []
 
 
@@ -155,7 +161,6 @@ def wczytaj_cache_z_sheets(klient_gspread):
             sheet.append_row(["Adres", "Lat", "Lng"])
             print("  Utworzono zakładkę 'Geo Cache'.")
             return sheet
-
         wiersze = sheet.get_all_records()
         for w in wiersze:
             adres = str(w.get("Adres", "")).strip()
@@ -187,7 +192,6 @@ def geokoduj(pelny_adres):
     """Geokoduje adres — najpierw sprawdza cache, potem odpytuje API."""
     if pelny_adres in geo_cache:
         return geo_cache[pelny_adres]
-
     for adres in [pelny_adres, oczysc_adres(pelny_adres)]:
         try:
             url = "https://maps.googleapis.com/maps/api/geocode/json"
@@ -207,7 +211,6 @@ def geokoduj(pelny_adres):
                 return lat, lng
         except Exception:
             continue
-
     geo_cache[pelny_adres] = (None, None)
     return None, None
 
@@ -223,7 +226,6 @@ def pobierz_mam_magnesy(klient_gspread):
             sheet.append_row(["Miejscowość", "Data dodania"])
             print("  Utworzono zakładkę 'Mam magnes'.")
             return []
-
         wiersze = sheet.get_all_records()
         magnesy = []
         for w in wiersze:
@@ -237,7 +239,6 @@ def pobierz_mam_magnesy(klient_gspread):
                 print(f"  ✓ {nazwa} -> {lat:.4f}, {lng:.4f}")
             else:
                 print(f"  ✗ BRAK GEOKODU: {nazwa}")
-
         print(f"  Geokodowano {len(magnesy)} miejscowości z 'Mam magnes'.")
         return magnesy
     except Exception as e:
@@ -248,7 +249,6 @@ def pobierz_mam_magnesy(klient_gspread):
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
 def generuj_mape_html(punkty, magnesy, data_aktualizacji, sheet_cache):
     """Generuje plik index.html z mapą Leaflet.js."""
-
     print("\nGeokodowanie adresów...")
     geokodowane = []
     nowe_wpisy = {}
@@ -265,10 +265,8 @@ def generuj_mape_html(punkty, magnesy, data_aktualizacji, sheet_cache):
         lat, lng = geokoduj(zapytanie)
 
         if lat and lng:
-            # Jeśli to nowy wpis — zapamiętaj do zapisania
             if not bylo_w_cache:
                 nowe_wpisy[zapytanie] = (lat, lng)
-
             geokodowane.append({
                 "nazwa": p["Punkt"],
                 "adres": p["Adres"],
@@ -285,7 +283,6 @@ def generuj_mape_html(punkty, magnesy, data_aktualizacji, sheet_cache):
     print(f"  Geokodowano {len(geokodowane)}/{len(punkty)} punktów.")
     print(f"  Nowych wpisów do cache: {len(nowe_wpisy)}")
 
-    # Zapisz nowe wpisy do cache w Sheets
     zapisz_nowe_do_cache(sheet_cache, nowe_wpisy)
 
     punkty_json = json.dumps(geokodowane, ensure_ascii=False)
@@ -331,7 +328,6 @@ def generuj_mape_html(punkty, magnesy, data_aktualizacji, sheet_cache):
     <div id="counter">Ładowanie...</div>
   </div>
   <div id="map"></div>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
   <script>
@@ -413,6 +409,15 @@ def generuj_mape_html(punkty, magnesy, data_aktualizacji, sheet_cache):
     print("Wygenerowano index.html")
 
 
+# ── Połączenie z Google Sheets (na początku — potrzebne do cache) ─────────
+print("Łączę z Google Sheets...")
+creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
+klient_gspread = gspread.authorize(creds)
+
+# ── Wczytaj cache geokodowania przed scrapingiem ──────────────────────────
+print("\nWczytuję cache geokodowania...")
+sheet_cache = wczytaj_cache_z_sheets(klient_gspread)
+
 # ── Główna pętla scrapera ──────────────────────────────────────────────────
 miasta = pobierz_liste_miast()
 print(f"Pobrano {len(miasta)} miast. Zaczynam analizę...")
@@ -423,7 +428,7 @@ for index, pozycja in enumerate(miasta):
         res = session.get(pozycja["url"], headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, 'html.parser')
         nazwa_z_h2 = pobierz_nazwe_miasta(soup)
-        miasto_format = nazwa_z_h2 if nazwa_z_h2 else pozycja["miasto"].replace(" ", ", ", 1)
+        miasto_format = nazwa_z_h2 if nazwa_z_h2 else pozycja["miasto"]
         znaleziono = 0
         kontenery = soup.find_all('div', class_='elementor-widget-container')
         for kontener in kontenery:
@@ -450,12 +455,8 @@ for index, pozycja in enumerate(miasta):
         print(f"BŁĄD: {e}")
     time.sleep(0.3)
 
-
 # ── Zapis do Google Sheets ────────────────────────────────────────────────
-print("\nŁączę z Google Sheets...")
-creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
-klient_gspread = gspread.authorize(creds)
-
+print("\nZapisuję dane do Google Sheets...")
 arkusz_dane, arkusz_log = polacz_z_arkuszem()
 arkusz_dane.clear()
 naglowki = ["Miejscowość", "Punkt", "Adres", "Pełny zapis (Miasto, Adres)"]
@@ -471,16 +472,12 @@ czas = datetime.now().strftime("%Y-%m-%d %H:%M")
 arkusz_log.append_row([czas, len(data_rows), f"OK – {len(miasta)} miast"])
 print(f"Zapisano {len(data_rows)} punktów do Google Sheets [{czas}]")
 
-# ── Wczytaj cache geokodowania ────────────────────────────────────────────
-print("\nWczytuję cache geokodowania...")
-sheet_cache = wczytaj_cache_z_sheets(klient_gspread)
-
 # ── Pobierz zakładkę "Mam magnes" ────────────────────────────────────────
 print("\nPobieram zakładkę 'Mam magnes'...")
 magnesy = pobierz_mam_magnesy(klient_gspread)
 
 # ── Generowanie mapy HTML ─────────────────────────────────────────────────
-print("\nRozpoczęcie generowania mapy HTML...")
+print("\nGeneruję mapę HTML...")
 try:
     generuj_mape_html(data_rows, magnesy, czas, sheet_cache)
     print("Mapa wygenerowana pomyślnie.")
