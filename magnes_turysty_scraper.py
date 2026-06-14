@@ -226,7 +226,7 @@ def pobierz_mam_magnesy(klient_gspread):
             sheet = arkusz.worksheet("Mam magnes")
         except gspread.exceptions.WorksheetNotFound:
             sheet = arkusz.add_worksheet(title="Mam magnes", rows=500, cols=2)
-            sheet.append_row(["Miejscowość", "Data dodania"])
+            sheet.append_row(["Miejscowość", "Województwo", "Miejscowość i województwo", "Data dodania"])
             print("  Utworzono zakładkę 'Mam magnes'.")
             return []
 
@@ -237,8 +237,10 @@ def pobierz_mam_magnesy(klient_gspread):
         for i, w in enumerate(wiersze[1:], start=2):  # start=2 bo wiersz 1 to nagłówek
             if not w or not w[0].strip():
                 continue
-            nazwa = w[0].strip()
-            data_dodania = w[1].strip() if len(w) > 1 else ""
+            nazwa = w[2].strip() if len(w) > 2 else ""  # kolumna C = Miejscowość i województwo
+            data_dodania = w[3].strip() if len(w) > 3 else ""  # kolumna D = Data dodania
+            if not nazwa:
+                continue
 
             zapytanie = f"{nazwa}, Polska"
             lat, lng = geokoduj(zapytanie)
@@ -253,7 +255,7 @@ def pobierz_mam_magnesy(klient_gspread):
 
         # Dopisz daty do pustych komórek
         for numer_wiersza, data in aktualizacje:
-            sheet.update_cell(numer_wiersza, 2, data)
+            sheet.update_cell(numer_wiersza, 4, data)  # kolumna D
             print(f"  Dodano datę {data} dla wiersza {numer_wiersza}")
 
         print(f"  Geokodowano {len(magnesy)} miejscowości z 'Mam magnes'.")
