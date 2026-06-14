@@ -105,42 +105,36 @@ def pobierz_nazwe_miasta(soup):
             return tekst
     return None
 
-
 def pobierz_liste_miast():
-    url = "https://magnesturysty.pl/page-sitemap.xml"
-    try:
-        response = session.get(url, headers=headers, timeout=20)
-        soup = BeautifulSoup(response.content, 'html.parser')
-        linki = []
-        for loc in soup.find_all('loc'):
-            adres = loc.text.strip()
-            if any(x in adres for x in [".png", ".jpg", "/sklep", "/kontakt",
-                                         "/regulamin", "/polityka",
-                                         "/miejscowosci", "/o-nas", "/o-projekcie"]):
-                continue
-            slug = adres.strip('/').split('/')[-1]
-            if len(slug) <= 3 or 'magnesturysty' in slug.lower():
-                continue
-            nazwa = slug.replace('-', ' ').title()
-            linki.append({"url": adres, "miasto": nazwa})
+    sitemaps = [
+        "https://magnesturysty.pl/page-sitemap.xml",
+        "https://magnesturysty.pl/page-sitemap2.xml",  # druga sitemap!
+    ]
+    seen = set()
+    linki = []
 
-        # ── Ręcznie dodane miejscowości których nie ma w sitemapie ──
-        brakujace = [
-            "https://magnesturysty.pl/gdynia-pomorskie/",
-            "https://magnesturysty.pl/jastrzebia-gora-pomorskie/",
-        ]
-        seen = {p["url"] for p in linki}
-        for adres in brakujace:
-            if adres not in seen:
+    for sitemap_url in sitemaps:
+        try:
+            response = session.get(sitemap_url, headers=headers, timeout=20)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            for loc in soup.find_all('loc'):
+                adres = loc.text.strip()
+                if any(x in adres for x in [".png", ".jpg", "/sklep", "/kontakt",
+                                             "/regulamin", "/polityka",
+                                             "/miejscowosci", "/o-nas", "/o-projekcie"]):
+                    continue
                 slug = adres.strip('/').split('/')[-1]
-                nazwa = slug.replace('-', ' ').title()
-                linki.append({"url": adres, "miasto": nazwa})
-                print(f"  Dodano ręcznie: {nazwa}")
+                if len(slug) <= 3 or 'magnesturysty' in slug.lower():
+                    continue
+                if adres not in seen:
+                    seen.add(adres)
+                    nazwa = slug.replace('-', ' ').title()
+                    linki.append({"url": adres, "miasto": nazwa})
+        except Exception as e:
+            print(f"Błąd sitemap {sitemap_url}: {e}")
 
-        return linki
-    except Exception as e:
-        print(f"Błąd sitemap: {e}")
-        return []
+    print(f"Znaleziono {len(linki)} miast łącznie.")
+    return linki
 
 
 # ── Geokodowanie przez Google Maps Geocoding API ──────────────────────────
