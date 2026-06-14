@@ -105,34 +105,29 @@ def pobierz_nazwe_miasta(soup):
             return tekst
     return None
 
+
 def pobierz_liste_miast():
-    url = "https://magnesturysty.pl/"
+    url = "https://magnesturysty.pl/page-sitemap.xml"
     try:
         response = session.get(url, headers=headers, timeout=20)
-        soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(response.content, 'html.parser')
         linki = []
-        seen = set()
-
-        for a in soup.find_all('a', class_='map_link'):
-            href = (a.get('href') or '').strip()
-            href = href.replace('https://www.magnesturysty.pl/', 'https://magnesturysty.pl/')
-            if not href.startswith('https://magnesturysty.pl/'):
+        for loc in soup.find_all('loc'):
+            adres = loc.text.strip()
+            if any(x in adres for x in [".png", ".jpg", "/sklep", "/kontakt",
+                                         "/regulamin", "/polityka",
+                                         "/miejscowosci", "/o-nas", "/o-projekcie"]):
                 continue
-            href = href.split('?')[0]
-            if not href.endswith('/'):
-                href += '/'
-            slug = href.strip('/').split('/')[-1]
-            if len(slug) <= 3 or 'magnesturysty' in slug.lower():
+            slug = adres.strip('/').split('/')[-1]
+            if len(slug) <= 3:
                 continue
-            if href not in seen:
-                seen.add(href)
-                nazwa = a.get_text(strip=True).lstrip('*')
-                linki.append({"url": href, "miasto": nazwa})
-
-        print(f"Znaleziono {len(linki)} miast ze strony głównej.")
+            if 'magnesturysty' in slug.lower():
+                continue
+            nazwa = slug.replace('-', ' ').title()
+            linki.append({"url": adres, "miasto": nazwa})
         return linki
     except Exception as e:
-        print(f"Błąd pobierania miast: {e}")
+        print(f"Błąd sitemap: {e}")
         return []
 
 
