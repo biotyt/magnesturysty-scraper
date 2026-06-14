@@ -199,9 +199,6 @@ def pobierz_liste_miast():
 
     print(f"Znaleziono {len(linki)} miast łącznie.")
     return linki
-    except Exception as e:
-        print(f"Błąd pobierania miast: {e}")
-        return []
 
 
 # ── Geokodowanie przez Google Maps Geocoding API ──────────────────────────
