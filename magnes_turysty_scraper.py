@@ -258,11 +258,9 @@ def generuj_mape_html(punkty, magnesy, data_aktualizacji, sheet_cache):
 
     for i, p in enumerate(punkty):
         if p["Adres"]:
-            miasto_krotko = p["Miejscowość"].split(',')[0].strip()
-            zapytanie = f"{p['Adres']}, {miasto_krotko}, Polska"
+            zapytanie = f"{p['Adres']}, {p['Miejscowość']}, Polska"
         else:
-            miasto_krotko = p["Miejscowość"].split(',')[0].strip()
-            zapytanie = f"{miasto_krotko}, Polska"
+            zapytanie = f"{p['Miejscowość']}, Polska"
 
         bylo_w_cache = zapytanie in geo_cache
         lat, lng = geokoduj(zapytanie)
