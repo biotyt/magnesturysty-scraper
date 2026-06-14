@@ -422,7 +422,7 @@ print("\nWczytuję cache geokodowania...")
 sheet_cache = wczytaj_cache_z_sheets(klient_gspread)
 
 # ── Główna pętla scrapera ──────────────────────────────────────────────────
-miasta = pobierz_liste_miast()
+miasta = pobierz_liste_miast()[:20]
 print(f"Pobrano {len(miasta)} miast. Zaczynam analizę...")
 
 for index, pozycja in enumerate(miasta):
