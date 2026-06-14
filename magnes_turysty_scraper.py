@@ -110,7 +110,7 @@ def pobierz_liste_miast():
     url = "https://magnesturysty.pl/page-sitemap.xml"
     try:
         response = session.get(url, headers=headers, timeout=20)
-        soup = BeautifulSoup(response.content, 'xml')
+        soup = BeautifulSoup(response.content, 'html.parser')
         linki = []
         for loc in soup.find_all('loc'):
             adres = loc.text.strip()
