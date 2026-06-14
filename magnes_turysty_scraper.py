@@ -161,6 +161,25 @@ def pobierz_liste_miast():
                 nazwa = slug.replace('-', ' ').title()
                 linki.append({"url": href, "miasto": nazwa})
 
+            print("\nLinki które NIE przeszły filtra województwa:")
+            for a in soup.find_all('a', href=True):
+                href = a['href'].strip()
+                href = href.replace('https://www.magnesturysty.pl/', 'https://magnesturysty.pl/')
+                if not href.startswith('https://magnesturysty.pl/'):
+                    continue
+                if not href.endswith('/'):
+                    href += '/'
+                slug = href.strip('/').split('/')[-1]
+                if len(slug) <= 3 or 'magnesturysty' in slug.lower():
+                    continue
+                if any(x in href for x in ['.png', '.jpg', '/sklep', '/kontakt',
+                                            '/regulamin', '/polityka', '/miejscowosci',
+                                            '/o-nas', '/o-projekcie', '/#', '?']):
+                    continue
+                if not any(slug.endswith(woj) for woj in WOJEWODZTWA):
+                    print(f"  ODFILTROWANY: {href}")
+
+        
         print(f"Znaleziono {len(linki)} miast ze strony głównej.")
         return linki
     except Exception as e:
