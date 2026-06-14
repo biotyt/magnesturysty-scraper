@@ -106,99 +106,34 @@ def pobierz_nazwe_miasta(soup):
     return None
 
 def pobierz_liste_miast():
-    """Pobiera listę miast ze strony głównej przez Selenium (obsługuje JavaScript)."""
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-    from webdriver_manager.chrome import ChromeDriverManager
-    import time as t
-
-    WOJEWODZTWA = [
-        'dolnoslaskie', 'kujawsko-pomorskie', 'lubelskie', 'lubuskie',
-        'lodzkie', 'malopolskie', 'mazowieckie', 'opolskie', 'podkarpackie',
-        'podlaskie', 'pomorskie', 'slaskie', 'swietokrzyskie',
-        'warminsko-mazurskie', 'wielkopolskie', 'zachodniopomorskie'
-    ]
-
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--window-size=1920,1080')
-
-    print("Uruchamiam Selenium...")
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=options
-    )
-
-    linki = []
-    seen = set()
-
+    url = "https://magnesturysty.pl/"
     try:
-        driver.get("https://magnesturysty.pl/")
-        # Poczekaj aż załadują się linki do miast
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "map_city"))
-        )
-        # Dodatkowe oczekiwanie na pełne załadowanie
-        t.sleep(3)
+        response = session.get(url, headers=headers, timeout=20)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        linki = []
+        seen = set()
 
-        elementy = driver.find_elements(By.CSS_SELECTOR, "a.map_link")
-        print(f"Znaleziono {len(elementy)} linków przez Selenium.")
-
-        for el in elementy:
-            href = el.get_attribute('href') or ''
+        for a in soup.find_all('a', class_='map_link'):
+            href = (a.get('href') or '').strip()
             href = href.replace('https://www.magnesturysty.pl/', 'https://magnesturysty.pl/')
             if not href.startswith('https://magnesturysty.pl/'):
                 continue
-            href = href.split('?')[0]  # Usuń parametry
+            href = href.split('?')[0]
             if not href.endswith('/'):
                 href += '/'
             slug = href.strip('/').split('/')[-1]
             if len(slug) <= 3 or 'magnesturysty' in slug.lower():
                 continue
-            if any(x in href for x in ['.png', '.jpg', '/sklep', '/kontakt',
-                                        '/regulamin', '/polityka']):
-                continue
             if href not in seen:
                 seen.add(href)
-                nazwa = slug.replace('-', ' ').title()
+                nazwa = a.get_text(strip=True).lstrip('*')
                 linki.append({"url": href, "miasto": nazwa})
 
+        print(f"Znaleziono {len(linki)} miast ze strony głównej.")
+        return linki
     except Exception as e:
-        print(f"Błąd Selenium: {e} — fallback na requests")
-        # Fallback na requests jeśli Selenium zawiedzie
-        try:
-            response = session.get("https://magnesturysty.pl/", headers=headers, timeout=20)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            for a in soup.find_all('a', href=True):
-                href = a['href'].strip()
-                href = href.replace('https://www.magnesturysty.pl/', 'https://magnesturysty.pl/')
-                if not href.startswith('https://magnesturysty.pl/'):
-                    continue
-                href = href.split('?')[0]
-                if not href.endswith('/'):
-                    href += '/'
-                slug = href.strip('/').split('/')[-1]
-                if len(slug) <= 3 or 'magnesturysty' in slug.lower():
-                    continue
-                if any(woj in slug for woj in WOJEWODZTWA) or slug == 'gora-swietej-anny':
-                    if href not in seen:
-                        seen.add(href)
-                        nazwa = slug.replace('-', ' ').title()
-                        linki.append({"url": href, "miasto": nazwa})
-        except Exception as e2:
-            print(f"Błąd fallback: {e2}")
-    finally:
-        driver.quit()
-
-    print(f"Znaleziono {len(linki)} miast łącznie.")
-    return linki
+        print(f"Błąd pobierania miast: {e}")
+        return []
 
 
 # ── Geokodowanie przez Google Maps Geocoding API ──────────────────────────
