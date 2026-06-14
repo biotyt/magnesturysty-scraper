@@ -111,6 +111,18 @@ def pobierz_liste_miast():
     try:
         response = session.get(url, headers=headers, timeout=20)
         soup = BeautifulSoup(response.text, 'html.parser')
+
+        wszystkie_a = soup.find_all('a', href=True)
+        print(f"Wszystkich tagów <a> na stronie: {len(wszystkie_a)}")
+        
+        # Pokaż ile zawiera magnesturysty
+        magnes_linki = [a['href'] for a in wszystkie_a if 'magnesturysty' in a.get('href', '')]
+        print(f"Linków z magnesturysty: {len(magnes_linki)}")
+        print("Przykłady:")
+        for l in magnes_linki[:10]:
+            print(f"  {l}")
+
+        
         linki = []
         seen = set()
 
