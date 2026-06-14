@@ -1,29 +1,61 @@
-name: Inicjuj listę miast
+import requests
+import gspread
+from google.oauth2.service_account import Credentials
+from bs4 import BeautifulSoup
 
-on:
-  workflow_dispatch:
+CREDENTIALS_FILE = "google_credentials.json"
+SPREADSHEET_NAME = "MagnesTurysty"
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                  '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+}
 
-jobs:
-  inicjuj:
-    runs-on: ubuntu-latest
+# Połącz z Google Sheets
+creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
+klient = gspread.authorize(creds)
+arkusz = klient.open(SPREADSHEET_NAME)
 
-    steps:
-      - name: Pobierz kod z repozytorium
-        uses: actions/checkout@v4
+try:
+    sheet = arkusz.worksheet("Miasta")
+    sheet.clear()
+except gspread.exceptions.WorksheetNotFound:
+    sheet = arkusz.add_worksheet(title="Miasta", rows=2000, cols=3)
 
-      - name: Ustaw Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+sheet.append_row(["Województwo", "Miasto", "URL"])
 
-      - name: Zainstaluj zależności
-        run: pip install requests beautifulsoup4 gspread google-auth
+# Pobierz stronę główną
+response = requests.get("https://magnesturysty.pl/", headers=headers, timeout=20)
+soup = BeautifulSoup(response.text, 'html.parser')
 
-      - name: Utwórz plik credentials z Secret
-        run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > google_credentials.json
+wiersze = []
+for accordion in soup.find_all('div', class_='eael-accordion-list'):
+    # Pobierz nazwę województwa z id
+    naglowek = accordion.find('div', class_='eael-accordion-header')
+    if not naglowek:
+        continue
+    woj_id = naglowek.get('id', '')
+    woj_nazwa = naglowek.find('span', class_='eael-accordion-tab-title')
+    woj_nazwa = woj_nazwa.get_text(strip=True) if woj_nazwa else woj_id
 
-      - name: Inicjuj listę miast
-        run: python inicjuj_miasta.py
+    # Pobierz miasta
+    for a in accordion.find_all('a', class_='map_link'):
+        href = (a.get('href') or '').strip()
+        href = href.replace('https://www.magnesturysty.pl/', 'https://magnesturysty.pl/')
+        href = href.split('?')[0]
+        if not href.endswith('/'):
+            href += '/'
+        nazwa = a.get_text(strip=True).lstrip('*')
+        if nazwa and href:
+            wiersze.append([woj_nazwa, nazwa, href])
+
+# Zapisz do Sheets
+print(f"Znaleziono {len(wiersze)} miast.")
+for i in range(0, len(wiersze), 100):
+    sheet.append_rows(wiersze[i:i+100])
+    
+print("Zapisano do zakładki 'Miasta'.")
