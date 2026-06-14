@@ -229,19 +229,33 @@ def pobierz_mam_magnesy(klient_gspread):
             sheet.append_row(["Miejscowość", "Data dodania"])
             print("  Utworzono zakładkę 'Mam magnes'.")
             return []
-        wiersze = sheet.get_all_records()
+
+        wiersze = sheet.get_all_values()
         magnesy = []
-        for w in wiersze:
-            nazwa = str(w.get("Miejscowość", "")).strip()
-            if not nazwa:
+        aktualizacje = []  # lista (numer_wiersza, data) do uzupełnienia
+
+        for i, w in enumerate(wiersze[1:], start=2):  # start=2 bo wiersz 1 to nagłówek
+            if not w or not w[0].strip():
                 continue
+            nazwa = w[0].strip()
+            data_dodania = w[1].strip() if len(w) > 1 else ""
+
             zapytanie = f"{nazwa}, Polska"
             lat, lng = geokoduj(zapytanie)
             if lat and lng:
                 magnesy.append({"miasto": nazwa, "lat": lat, "lng": lng})
                 print(f"  ✓ {nazwa} -> {lat:.4f}, {lng:.4f}")
+                # Jeśli brak daty — dopisz dzisiejszą
+                if not data_dodania:
+                    aktualizacje.append((i, datetime.now().strftime("%Y-%m-%d")))
             else:
                 print(f"  ✗ BRAK GEOKODU: {nazwa}")
+
+        # Dopisz daty do pustych komórek
+        for numer_wiersza, data in aktualizacje:
+            sheet.update_cell(numer_wiersza, 2, data)
+            print(f"  Dodano datę {data} dla wiersza {numer_wiersza}")
+
         print(f"  Geokodowano {len(magnesy)} miejscowości z 'Mam magnes'.")
         return magnesy
     except Exception as e:
