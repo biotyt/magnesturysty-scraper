@@ -157,7 +157,7 @@ def wczytaj_cache_z_sheets(klient_gspread):
             sheet = arkusz.worksheet("Geo Cache")
         except gspread.exceptions.WorksheetNotFound:
             sheet = arkusz.add_worksheet(title="Geo Cache", rows=5000, cols=3)
-            sheet.append_row(["Adres", "Lat", "Lng"])
+            sheet.append_row(["Adres", "Lat", "Lng", "Data dodania"])
             print("  Utworzono zakładkę 'Geo Cache'.")
             return sheet
 
@@ -184,7 +184,8 @@ def zapisz_nowe_do_cache(sheet_cache, nowe_wpisy):
     """Dopisuje tylko nowe wpisy do zakładki 'Geo Cache'."""
     if not nowe_wpisy or sheet_cache is None:
         return
-    wiersze = [[adres, str(lat).replace(",", "."), str(lng).replace(",", ".")] 
+    dzisiaj = datetime.now().strftime("%Y-%m-%d")
+    wiersze = [[adres, str(lat).replace(",", "."), str(lng).replace(",", "."), dzisiaj]
                for adres, (lat, lng) in nowe_wpisy.items()]
     for i in range(0, len(wiersze), 100):
         sheet_cache.append_rows(wiersze[i:i+100])
