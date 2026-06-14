@@ -150,7 +150,6 @@ def oczysc_adres(pelny_adres):
 
 
 def wczytaj_cache_z_sheets(klient_gspread):
-    """Wczytuje zapisane współrzędne z zakładki 'Geo Cache'."""
     global geo_cache
     try:
         arkusz = klient_gspread.open(SPREADSHEET_NAME)
@@ -161,12 +160,15 @@ def wczytaj_cache_z_sheets(klient_gspread):
             sheet.append_row(["Adres", "Lat", "Lng"])
             print("  Utworzono zakładkę 'Geo Cache'.")
             return sheet
-        wiersze = sheet.get_all_records()
-        for w in wiersze:
-            adres = str(w.get("Adres", "")).strip()
+
+        wiersze = sheet.get_all_values()
+        for w in wiersze[1:]:  # Pomiń nagłówek
+            if len(w) < 3:
+                continue
+            adres = w[0].strip()
             try:
-                lat = float(str(w.get("Lat", "")).replace(",", "."))
-                lng = float(str(w.get("Lng", "")).replace(",", "."))
+                lat = float(w[1].replace(",", ".").replace(" ", ""))
+                lng = float(w[2].replace(",", ".").replace(" ", ""))
                 if adres and lat and lng:
                     geo_cache[adres] = (lat, lng)
             except (ValueError, TypeError):
@@ -182,7 +184,8 @@ def zapisz_nowe_do_cache(sheet_cache, nowe_wpisy):
     """Dopisuje tylko nowe wpisy do zakładki 'Geo Cache'."""
     if not nowe_wpisy or sheet_cache is None:
         return
-    wiersze = [[adres, lat, lng] for adres, (lat, lng) in nowe_wpisy.items()]
+    wiersze = [[adres, str(lat).replace(",", "."), str(lng).replace(",", ".")] 
+               for adres, (lat, lng) in nowe_wpisy.items()]
     for i in range(0, len(wiersze), 100):
         sheet_cache.append_rows(wiersze[i:i+100])
     print(f"  Dopisano {len(wiersze)} nowych wpisów do cache.")
