@@ -106,35 +106,52 @@ def pobierz_nazwe_miasta(soup):
     return None
 
 def pobierz_liste_miast():
-    sitemaps = [
-        "https://magnesturysty.pl/page-sitemap.xml",
-        "https://magnesturysty.pl/page-sitemap2.xml",  # druga sitemap!
-    ]
-    seen = set()
-    linki = []
+    """Pobiera listę miast ze strony głównej magnesturysty.pl."""
+    url = "https://magnesturysty.pl/"
+    try:
+        response = session.get(url, headers=headers, timeout=20)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        linki = []
+        seen = set()
 
-    for sitemap_url in sitemaps:
-        try:
-            response = session.get(sitemap_url, headers=headers, timeout=20)
-            soup = BeautifulSoup(response.content, 'html.parser')
-            for loc in soup.find_all('loc'):
-                adres = loc.text.strip()
-                if any(x in adres for x in [".png", ".jpg", "/sklep", "/kontakt",
-                                             "/regulamin", "/polityka",
-                                             "/miejscowosci", "/o-nas", "/o-projekcie"]):
-                    continue
-                slug = adres.strip('/').split('/')[-1]
-                if len(slug) <= 3 or 'magnesturysty' in slug.lower():
-                    continue
-                if adres not in seen:
-                    seen.add(adres)
-                    nazwa = slug.replace('-', ' ').title()
-                    linki.append({"url": adres, "miasto": nazwa})
-        except Exception as e:
-            print(f"Błąd sitemap {sitemap_url}: {e}")
+        WOJEWODZTWA = [
+            'dolnoslaskie', 'kujawsko-pomorskie', 'lubelskie', 'lubuskie',
+            'lodzkie', 'malopolskie', 'mazowieckie', 'opolskie', 'podkarpackie',
+            'podlaskie', 'pomorskie', 'slaskie', 'swietokrzyskie',
+            'warminsko-mazurskie', 'wielkopolskie', 'zachodniopomorskie'
+        ]
 
-    print(f"Znaleziono {len(linki)} miast łącznie.")
-    return linki
+        for a in soup.find_all('a', href=True):
+            href = a['href'].strip()
+            # Normalizuj URL
+            if href.startswith('https://www.magnesturysty.pl/'):
+                href = href.replace('https://www.magnesturysty.pl/', 'https://magnesturysty.pl/')
+            if not href.startswith('https://magnesturysty.pl/'):
+                continue
+            # Dodaj trailing slash jeśli brak
+            if not href.endswith('/'):
+                href += '/'
+            # Odfiltruj niechciane
+            if any(x in href for x in ['.png', '.jpg', '/sklep', '/kontakt',
+                                        '/regulamin', '/polityka', '/miejscowosci',
+                                        '/o-nas', '/o-projekcie', '/#', '?']):
+                continue
+            slug = href.strip('/').split('/')[-1]
+            if len(slug) <= 3 or 'magnesturysty' in slug.lower():
+                continue
+            # Sprawdź czy slug kończy się nazwą województwa
+            if not any(slug.endswith(woj) for woj in WOJEWODZTWA):
+                continue
+            if href not in seen:
+                seen.add(href)
+                nazwa = slug.replace('-', ' ').title()
+                linki.append({"url": href, "miasto": nazwa})
+
+        print(f"Znaleziono {len(linki)} miast ze strony głównej.")
+        return linki
+    except Exception as e:
+        print(f"Błąd pobierania miast: {e}")
+        return []
 
 
 # ── Geokodowanie przez Google Maps Geocoding API ──────────────────────────
