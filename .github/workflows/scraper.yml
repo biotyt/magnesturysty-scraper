@@ -26,11 +26,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Zainstaluj Chrome
-        uses: browser-actions/setup-chrome@v1
-
       - name: Zainstaluj zależności
-        run: pip install requests beautifulsoup4 gspread google-auth selenium webdriver-manager
+        run: pip install requests beautifulsoup4 gspread google-auth
 
       - name: Utwórz plik credentials z Secret
         run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > google_credentials.json
