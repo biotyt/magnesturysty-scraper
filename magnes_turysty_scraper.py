@@ -126,6 +126,8 @@ def pobierz_liste_miast():
             # Normalizuj URL
             if href.startswith('https://www.magnesturysty.pl/'):
                 href = href.replace('https://www.magnesturysty.pl/', 'https://magnesturysty.pl/')
+            # Normalizuj www
+            href = href.replace('https://www.magnesturysty.pl/', 'https://magnesturysty.pl/')
             if not href.startswith('https://magnesturysty.pl/'):
                 continue
             # Dodaj trailing slash jeśli brak
