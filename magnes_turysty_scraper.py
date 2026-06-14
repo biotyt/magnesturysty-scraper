@@ -107,37 +107,12 @@ def pobierz_nazwe_miasta(soup):
 
 
 def pobierz_liste_miast():
-    """Pobiera listę miast ze strony głównej magnesturysty.pl."""
-    url = "https://magnesturysty.pl/"
+    url = "https://magnesturysty.pl/page-sitemap.xml"
     try:
         response = session.get(url, headers=headers, timeout=20)
-        soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(response.content, 'xml')
         linki = []
-        seen = set()
-
-        for a in soup.find_all('a', href=True):
-            href = a['href']
-            # Szukamy linków w formacie /nazwa-miejscowosci-wojewodztwo/
-            if not href.startswith('https://magnesturysty.pl/'):
-                href = 'https://magnesturysty.pl/' + href.lstrip('/')
-            if any(x in href for x in [".png", ".jpg", "/sklep", "/kontakt",
-                                        "/regulamin", "/polityka",
-                                        "/miejscowosci", "/o-nas",
-                                        "/o-projekcie", "/#", "?_gl"]):
-                continue
-            slug = href.strip('/').split('/')[-1]
-            if len(slug) <= 3 or 'magnesturysty' in slug.lower():
-                continue
-            if href not in seen:
-                seen.add(href)
-                nazwa = slug.replace('-', ' ').title()
-                linki.append({"url": href, "miasto": nazwa})
-
-        # Fallback — uzupełnij sitemapą
-        sitemap_url = "https://magnesturysty.pl/page-sitemap.xml"
-        resp2 = session.get(sitemap_url, headers=headers, timeout=20)
-        soup2 = BeautifulSoup(resp2.content, 'html.parser')
-        for loc in soup2.find_all('loc'):
+        for loc in soup.find_all('loc'):
             adres = loc.text.strip()
             if any(x in adres for x in [".png", ".jpg", "/sklep", "/kontakt",
                                          "/regulamin", "/polityka",
@@ -146,15 +121,25 @@ def pobierz_liste_miast():
             slug = adres.strip('/').split('/')[-1]
             if len(slug) <= 3 or 'magnesturysty' in slug.lower():
                 continue
+            nazwa = slug.replace('-', ' ').title()
+            linki.append({"url": adres, "miasto": nazwa})
+
+        # ── Ręcznie dodane miejscowości których nie ma w sitemapie ──
+        brakujace = [
+            "https://magnesturysty.pl/gdynia-pomorskie/",
+            "https://magnesturysty.pl/jastrzebia-gora-pomorskie/",
+        ]
+        seen = {p["url"] for p in linki}
+        for adres in brakujace:
             if adres not in seen:
-                seen.add(adres)
+                slug = adres.strip('/').split('/')[-1]
                 nazwa = slug.replace('-', ' ').title()
                 linki.append({"url": adres, "miasto": nazwa})
+                print(f"  Dodano ręcznie: {nazwa}")
 
-        print(f"Znaleziono {len(linki)} miast (strona główna + sitemap).")
         return linki
     except Exception as e:
-        print(f"Błąd pobierania miast: {e}")
+        print(f"Błąd sitemap: {e}")
         return []
 
 
