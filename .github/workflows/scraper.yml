@@ -2,7 +2,7 @@ name: MagnesTurysty Scraper
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '23 0 * * 2,5'
   workflow_dispatch:
 
 env:
